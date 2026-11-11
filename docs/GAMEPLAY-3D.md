@@ -1,129 +1,147 @@
-# Quantum World: 3D Open-World Direction (Draft v0.1)
+# Quantum World: 3D Open-World Direction (Draft v0.2)
 
-This document replaces the match-3 core described in earlier versions of `PLAN.md`. The match-3 prototype stays in the repository as a possible in-world minigame (see section 9). Network, ledger, shop and offline documents remain valid; section 8 lists what changes in them.
+Changes against v0.1: no level list, progression through **avatar levels**; one large **open world with challenges**, MMO-like within the limits of a decentralized design; **smooth terrain** instead of blocks; **phone first**; more elegant avatars. The match-3 prototype stays in the repository as a possible minigame (section 11).
 
 ## 1. Direction
 
-Quantum World becomes a **3D third-person open-world adventure**: run, jump, glide, collect, explore, build. Think Mario-style movement and collecting combined with Minecraft-style blocky worlds and building, with **attractive anime-style avatars** and a style that appeals to teenagers and adults, not a toddler look. No physics puzzles.
+Quantum World is a **3D third-person open-world adventure for Android phones**: run, jump, glide, climb, explore, take on challenges, and grow your avatar's level. It feels like a small MMO (other players are visible in the world and in the Nexus, crews, shared world events), with **attractive anime-style avatars** and a style for teenagers and adults. No physics puzzles, no real-time PvP.
 
 ## 2. Pillars
 
-1. **Movement is the fun.** Tight, juicy platforming: run, jump, double jump, dash, glide, wall slide. It must feel good within the first 30 seconds.
-2. **Explore and collect.** Shards, secrets, hidden areas, new worlds. Curiosity is the progression.
-3. **Build and shape.** Block-based building in your own world.
-4. **Style and identity.** Good-looking anime avatars and fashion as self-expression and progression.
-5. **No physics puzzles.** Movement is kinematic and predictable; challenges are about timing, routes and exploration.
-6. **Social, but latency-tolerant** (Tor/I2P, see section 6).
+1. **Phone first.** Every feature is designed for touch, short sessions, battery and heat limits (section 3).
+2. **Movement is the fun.** Tight, juicy platforming: run, jump, double jump, dash, glide, wall slide. It must feel good within the first 30 seconds.
+3. **Challenges everywhere.** The open world is full of short challenges (1 to 3 minutes) with Bronze, Silver and Gold tiers.
+4. **Avatar growth.** The avatar levels up, unlocks abilities, regions and style options. Progress belongs to the avatar, not to a level list.
+5. **Style and identity.** Elegant, attractive anime avatars and fashion as self-expression.
+6. **Social, but latency-tolerant** over Tor/I2P (section 8).
 7. **Anonymous, decentralized, offline-capable** as before.
 
-## 3. Art and Tone
+## 3. Phone-First Rules
 
-- **Look:** stylized cel-shaded anime, clean outlines, expressive faces, 7 to 8 head proportions, a stylish and slightly mature adventure tone. Bright, saturated daytime worlds and moody neon night worlds. Sakura forests, crystal canyons, floating ruins, neon cities, deep ocean.
-- **Avatars:** cool and attractive, not childish. Outfits: streetwear, techwear, fantasy armor, casual wear, accessories, auras, hair and eye styles, animation sets.
-- **Hard content rules (not obscene):** all avatars and items are fully clothed, no sexualized outfits, poses or body options, no nudity, no exaggerated body features. This is enforced in the avatar kit itself (only approved parts exist) and in shop review. The audience starts at age 12; target rating PEGI 12 / ESRB Teen or lower. Violence is minimal: no blood, enemies bounce away or dissolve.
-- **Music:** anime-style: energetic synth and rock for action, orchestral and lo-fi for calm exploration, adaptive layers. Original or commissioned only; no existing anime songs.
-- **Avoid copying** existing characters or games. Build an own look.
+- **Landscape, two thumbs:** left stick, right-side camera drag, large jump and dash buttons, optional auto-run and assist features (coyote time, jump buffering, ledge assist, aim assist for gliding). Layout is customizable.
+- **Short sessions:** a rewarding loop in 3 to 5 minutes. Challenge starts are visible and close together; fast travel through portals.
+- **Performance budget (mid-range phone, for example a Snapdragon 7 class GPU):** 30 fps stable, 60 fps optional; visible geometry around 100k to 150k triangles; under about 150 draw calls; one main texture atlas per area; avatar up to about 15k triangles.
+- **Adaptive quality:** resolution scale, view distance and effect level adjust automatically to temperature and frame time.
+- **Battery and heat:** frame cap options, no constant full-load rendering, network layer active only when needed.
+- **Download size:** base install under about 150 MB; regions and cosmetics are downloaded or generated on demand and cached.
+- **Offline:** the whole overworld is playable offline (`OFFLINE.md`).
+- **Readable UI:** big touch targets, safe areas for notches, colorblind-safe symbols.
 
-## 4. World Structure
+## 4. Art and Tone
 
-- **Universe -> worlds -> regions -> settlements.** Each world is generated from a **seed**; all clients generate identical terrain, so only differences (edits) need storing.
-- **Terrain:** blocky voxel look with bevels, vertex ambient occlusion and toon shading, so it reads as stylish rather than a plain Minecraft clone.
-- **Hand-made set pieces** (parkour towers, ruins, shrines, mini dungeons, secret chambers) are placed by the seed into the generated terrain. This avoids a generic procedural feel.
-- **Nexus:** the social hub in the sky, reached through portals.
-- **Teleport network:** portals link worlds, the Nexus and friends' worlds (interconnected, as in the earlier plan).
-- **Public worlds are not editable.** They are shared seeds; only each player's collected items and discoveries are personal. This avoids griefing, moderation load and storage growth.
-- **Private home worlds are editable.** Each player builds in their own world; others can visit it. Edits are stored as compact deltas on the device and cached by peers.
+- **Look:** stylized cel-shaded anime, clean outlines, expressive faces, soft rim light, bright saturated days and moody neon nights. Sakura valleys, crystal canyons, floating ruins, neon cities, island chains, deep ocean.
+- **Avatars:** elegant and attractive, not chubby or childish. Target proportions 7 to 8 heads, slim build, long legs, large expressive eyes, hair with strands and secondary motion, cloth and accessory motion. Outfits: streetwear, techwear, fantasy armor, casual wear, accessories, auras, hair and eye styles, animation sets.
+- **Hard content rules (not obscene):** all avatars and items are fully clothed, no sexualized outfits, poses or body options, no nudity, no exaggerated body features. This is enforced in the avatar kit (only approved parts exist) and in shop review. The audience starts at age 12; target rating PEGI 12 / ESRB Teen or lower. Violence is minimal: no blood; glitch enemies dissolve.
+- **Music:** anime style: energetic synth and rock for action, orchestral and lo-fi for exploration, adaptive layers. Original or commissioned only.
+- **Avoid copying** existing characters or games.
 
-## 5. Core Loop and Progression
+## 5. The Open World
 
-**Loop (2 to 10 minutes per trip):** enter a world, traverse and platform, collect Quantum shards, find secrets and complete parkour set pieces, return, spend and build, teleport on.
+- **One shared overworld** (working name: Aurora Archipelago): a large, seed-generated world of smooth terrain: rolling hills, cliffs, rivers, islands connected by bridges, gliding routes and portals. Several overworlds (biome themes) can follow as the universe grows.
+- **Regions** have a recommended avatar level and ability requirements, but no hard walls: a skilled player can reach early any place their abilities allow.
+- **Hand-made set pieces** (towers, ruins, shrines, floating ring paths, caves) are placed by the seed into generated terrain.
+- **Public overworld is static:** terrain and structures are identical for everyone; only personal progress and discoveries differ. This avoids griefing and keeps storage tiny.
+- **Home islands:** each player has a private home island to decorate with placeable objects (furniture, plants, structures, music stations) and to invite visitors. Smooth terrain sculpting is limited to soft tools (raise, lower, flatten), stored as compact deltas.
+- **Nexus:** the sky hub with portals, shop, crews and events.
+- **Day and night, weather** are cosmetic and synchronized by chain time (epoch) so players see the same sky.
 
-**Abilities as progression (Metroidvania style):** double jump, dash, glide, wall run, grapple. New abilities open previously unreachable areas, so worlds feel connected and revisiting pays off.
+## 6. Avatar Level and Progression
 
-**Quantum-themed mechanics** (no physics puzzles, only timing and routes):
-- *Phase blocks* (superposition): blocks appear and disappear on a rhythm.
-- *Entangled portals:* paired portals teleport you between two places.
-- *Tunneling:* a dash passes through thin walls.
-- *Collapse:* a ground pound breaks cracked blocks.
-- *Observer platforms:* exist only while you look at them.
+- **Avatar level 1 to 50** (cap raised with seasons). XP comes from challenges, discoveries, events and exploration, with daily caps on repeatable sources.
+- **What levels unlock:** abilities (for example wall run, grapple, air dash), access recommendations for regions, challenge tiers, emote and outfit slots, titles, a small number of ability-tree points.
+- **Ability tree (3 branches):** Mobility (movement upgrades), Exploration (map, scanning, detection), Style (customization, animations). Choices are about playstyle, not raw power.
+- **No pay to win:** levels and XP cannot be bought. Cosmetics and convenience are the only shop categories. There is no PvP, so levels never create unfair advantage over other players.
+- **Public signal:** avatar level and titles are shown above avatars in the Nexus and the world.
+- **Ledger:** `AvatarProgress(pubkey, xp_total, level, ability_mask)` as a leaf in `CHAIN-DESIGN.md`. XP is minted by verified claims under per-epoch caps.
 
-**Hazards and enemies:** light and non-violent: glitch creatures to dodge, stomp or dash through, falling hazards, timed gates.
+## 7. Challenges
 
-**Collectibles and events:** shards feed the Quanta event pools from `CHAIN-DESIGN.md`: daily fluctuation, discoveries (first finder of a secret), seasons, raids. See section 8.
-
-## 6. Multiplayer Within Latency Limits
-
-Tor and I2P give roughly 300 ms to 2 s round-trip time with jitter.
-
-| Feature | Feasible over Tor/I2P? | Approach |
+| Challenge | Description | Verification |
 |---|---|---|
-| See other players in the Nexus and worlds | Yes | Position updates at 2 to 5 Hz, interpolation, no collisions between players |
-| Emotes, chat, parties of 2 to 4 | Yes | Visual presence only, no shared physics |
-| Co-op events and raids | Yes | Shared progress counters, not shared real-time physics |
-| Ghost races and time trials | Yes | Asynchronous: replay of a signed input recording |
-| Real-time competitive play (PvP, race at the same moment) | No | Out of scope by default |
+| **Parkour trial** | Start ring, route through platforms, finish ring, time tiers | Input replay |
+| **Shard run** | Collect all shards on a route within a time limit | Input replay or plausibility check |
+| **Glitch hunt** | Chase or dodge glitch creatures, no violence | Input replay |
+| **Secret** | Hidden chamber or path, first finder gets a bonus | Replay for first-finder claims |
+| **Ghost race** | Beat the recorded run of another player | Signed replay of the ghost |
+| **Photo task** | Pose avatar at a spot with an emote | Position plausibility |
+| **World event** | Co-op event with a shared progress counter over hours or days (for example a Glitch Titan whose nodes players activate) | Aggregated verified contributions |
+| **Daily fluctuation** | Rotating modifiers and bonus spots chosen by chain randomness | Per daily rules |
 
-Optional later: an opt-in "fast mode" with direct low-latency connections for friends, with a clear warning that it exposes IP addresses. Not planned for v1.
+Rewards: XP, shards (Quanta event pools), cosmetics, titles. Pools and anti-farming are in `CHAIN-DESIGN.md` section 6.
 
-## 7. Technology
+## 9a. Quantum Mechanics (themes, no physics puzzles)
 
-- **Engine:** Godot 4.3, 3D. Mobile renderer (Vulkan) where supported, GL Compatibility as fallback. Toon shader with outline, simple dynamic lighting, baked or cheap shadows.
-- **Rust core via GDExtension (godot-rust):** world generation and chunk meshing (greedy meshing, threaded), the deterministic character controller, and replay verification. The same crate `qw-core` runs in Keepers and servers (`SERVER.md`), so verification uses identical code.
-- **Deterministic movement:** gameplay-critical movement uses a custom fixed-timestep kinematic controller with fixed-point or carefully controlled math, not Godot's physics engine. This makes input replays reproducible on any device.
-- **Voxel budget on mid-range Android:** chunks of 16 x 16 x 64 or similar, view distance of about 6 to 8 chunks, LOD for far terrain, a strict draw-call budget. Target 30 fps minimum, 60 fps preferred.
-- **Avatars:** glTF/VRM-style kit, under about 15k triangles per avatar, LOD or billboards beyond a distance, at most about 8 detailed avatars on screen. Only parameters travel over the network.
-- **Controls:** left virtual stick, right-side camera drag, jump and dash buttons, assist features (coyote time, jump buffering, auto-step). Gamepad support.
-- **Camera:** third-person orbit with collision handling.
-- **Reuse from the existing prototype:** the xorshift RNG (`scripts/core/rng.gd`) idea and the replay pattern, local save store, level/session structure for minigames.
+- *Phase platforms* (superposition) appear and disappear on a rhythm.
+- *Entangled portals* link two places.
+- *Tunneling:* a dash passes through thin barriers.
+- *Collapse:* a ground pound breaks cracked structures.
+- *Observer platforms* exist only while looked at.
 
-## 8. Impact on the Other Documents
+## 8. MMO-Like Multiplayer Within Decentralized Limits
 
-- `CHAIN-DESIGN.md` 6.3 (claim verification): claims become **input-recording replays** plus collectible/discovery references instead of match-3 move lists. Compact encoding is needed (run-length encoded input at a fixed tick rate, a few KB per minute). Collectible claims can also use plausibility checks (speed and distance bounds) for low-value rewards, with replay verification for high-value or first-finder rewards. Leaves such as `ClearBitmap` become `CollectedBitmap(pubkey, world, bitmap)`.
-- `SUSTAINABILITY.md`: avatar fashion becomes the main shop category. This fits a teenage audience well. Rules stay: cosmetics and convenience only, no pay to win, no paid random boxes.
-- `IDENTITY-SHOP.md`: avatar content rules in section 3 above apply to the shop catalogue; age and minors rules remain.
-- `OFFLINE.md`: single-player worlds, private home worlds and building work offline; presence and events need the network.
-- `SERVER.md`, `PLAN.md` section 4: unchanged except the latency table in section 6 above.
+A real MMO (server-authoritative, real-time, thousands of players, PvP) needs central servers with low latency and costs money. It conflicts with no servers, Tor/I2P (300 ms to 2 s round trip) and anonymity. The realistic target is **MMO-lite**:
 
-## 9. The Match-3 Prototype
+| Feature | Approach |
+|---|---|
+| Seeing other players in the overworld and Nexus | Channels of about 30 to 50 visible players, interest management by distance, position updates at 2 to 5 Hz with interpolation, no player collisions |
+| World feels populated | **Ghost crowd:** recorded runs of real players (signed replays) appear as translucent ghost avatars, plus NPCs; real players are shown opaque |
+| Crews (guilds) | Groups with a signed member list, crew chat with emotes, crew challenges and crew home |
+| Co-op world events | Shared progress counters, not shared real-time physics |
+| Trading | Asynchronous trade offers, signed by both sides |
+| Competition | Asynchronous: ghost races, leaderboards from signed replays |
+| PvP, real-time races | Not planned |
 
-The tested match-3 core (`scripts/core/`, `scenes/main.tscn`, 20 levels) stays in the repository. Options: an in-world "puzzle terminal" minigame in the Nexus that pays small shard rewards with deterministic replay claims, or removal later. No further work on it until the 3D slice proves itself.
+Optional later: operator-run "fast realms" with lower latency through direct connections, with a clear warning that they expose IP addresses. Not part of v1.
 
-## 10. Phase 1 (new): 3D Vertical Slice
+## 9. Technology
 
-Goal: prove that moving through the world and collecting feels good, and that the avatar style appeals to the target audience.
+- **Engine:** Godot 4.3, 3D. Mobile-first rendering path; toon shader with outline; cheap or baked shadows.
+- **Smooth terrain without losing determinism:** the world is a **heightfield** defined by an integer-only noise function (as in the current prototype's world generator). Gameplay collision uses the same integer heightfield plus analytic primitives (boxes, cylinders, ramps) for set pieces, never mesh physics. Rendering uses chunked, LOD'd meshes generated from the same function, with normals and splat colors from slope and height. Terrain3D or similar Godot addons may be evaluated for rendering only; collision stays in our core.
+- **Deterministic controller on a heightfield:** fixed 60 Hz tick, fixed-point math, slope rules (walkable under a threshold, slide above), ledge and step assist. Replays of per-tick inputs verify challenge claims (`CHAIN-DESIGN.md` 6.3).
+- **Rust core via GDExtension:** heightfield sampling, chunk meshing, the controller and replay verification in the shared `qw-core` crate, also used by Keepers and servers.
+- **Streaming:** chunks around the player are generated or loaded on demand; far terrain as low-detail impostors.
+- **Avatars:** glTF/VRM-style closed kit on a few base rigs, toon shading with outline and rim light, hair and cloth secondary motion kept cheap (bone chains), LOD or billboards beyond a distance, parameters only over the network.
+- **Controls:** see section 3.
 
-- Third-person controller: run, jump, double jump, dash, glide, coyote time, jump buffering, camera.
-- One seeded voxel island, about 10 minutes of traversal, about 50 shards, 3 parkour set pieces, 1 secret.
-- Basic block placing and breaking (or breaking only) to test the building feel.
-- One anime avatar with toon shader, 3 outfits and basic animations (idle, run, jump, glide, emote).
-- Mobile touch controls, HUD, day/night cycle, placeholder music.
-- Android build tested on 2 to 3 real devices; measure frame rate, heat and battery.
-- Soft test with teenagers: session length, shards collected, return rate.
+## 10. Impact on the Other Documents
 
-Out of scope for the slice: networking, ledger, shop, accounts.
+- `CHAIN-DESIGN.md`: new leaf `AvatarProgress`; claims are input replays plus challenge ids; XP and Quanta pools per epoch; `CollectedBitmap` per region.
+- `SUSTAINABILITY.md`: avatar fashion remains the main shop category; the Quantum Pass has an XP-free cosmetic track (no XP selling).
+- `IDENTITY-SHOP.md`: the avatar content rules in section 4 apply to the shop; age and minors rules remain.
+- `OFFLINE.md`: overworld, challenges and home island work offline; presence and events need the network.
+- `SERVER.md`, `PLAN.md` section 4: unchanged except the MMO-lite table above and channel sizes.
 
-Estimate: 3 to 5 months for a small team with an artist. Alone, with free or purchased assets, expect longer. Art (avatars, animation, environment) is the largest cost.
+## 11. Prototype Status and Next Phase
 
-## 11. Risks
+- **Existing:** a voxel-based controller prototype with deterministic movement, tests and a placeholder avatar, plus the match-3 prototype. The deterministic simulation, replay, tests, touch controls and camera are reusable; the voxel ground model is replaced by the heightfield.
+- **Phase 1 (new):**
+  1. Heightfield overworld island with smooth terrain, slope rules and the controller adapted to it.
+  2. Avatar proxy with elegant proportions as an interim, then a first real avatar from the asset pipeline (`ASSET-PIPELINE.md`).
+  3. Challenge framework: start ring, timer, finish, tiers, ghost replay, rewards.
+  4. Avatar XP and level HUD, first ability unlock.
+  5. Android export and tests on 2 to 3 real phones: frame rate, heat, battery, touch feel.
+  6. Soft test with teenagers.
+- **Match-3:** stays as a possible Nexus puzzle terminal; no further work until the slice proves itself.
+
+## 12. Risks
 
 | Risk | Mitigation |
 |---|---|
-| Scope: open world, voxel, avatars, multiplayer and chain together are very large | Strict slice first, public worlds non-editable, networking later |
-| Art cost and quality (anime avatars, animations) | Commission an artist, use licensed or CC0 base assets, check licenses of tools like VRoid for commercial use |
-| Mobile performance of voxels plus toon rendering | Rust meshing, LOD, strict budgets, early device tests |
-| Deterministic replay of a platformer is harder than match-3 | Custom fixed-timestep controller from day one, shared `qw-core` |
-| Latency over Tor/I2P | Loose-sync presence, async competition, no real-time PvP |
-| Content and moderation (teen audience, avatars) | Closed avatar kit, fully clothed rule, emotes-first chat, rating review |
-| Looking like a Minecraft clone | Own art direction, set pieces, abilities and quantum mechanics |
-| Teenage retention | Movement feel, secrets, fashion progression, seasons |
+| Scope: open world, MMO feel, avatars, ledger | Strict slice, one island first, MMO-lite only, networking later |
+| Phone performance of smooth open terrain | Budgets, LOD, streaming, adaptive quality, early device tests |
+| Determinism with smooth terrain and slopes | Integer heightfield, analytic colliders only, shared core, replay tests |
+| Art cost and quality (avatars, animation, environment) | Artist plus AI pipeline, base rigs, clear style bible |
+| MMO expectations vs Tor latency | Communicate MMO-lite, ghost crowd, async competition |
+| Teen audience, moderation | Closed avatar kit, emotes first, rating review, local block lists |
+| XP farming and bots | Daily caps, replay verification, pro rata pools |
+| Retention in an open world | Challenges everywhere, seasons, crews, daily events |
 
-## 12. Open Questions
+## 13. Open Questions
 
-1. Voxel blocks with bevels (recommended), or smooth terrain?
-2. Third-person only, or also a first-person option?
-3. How much action: pure platforming and collecting, or light combat too?
-4. Do you accept asynchronous races and loose-sync presence instead of real-time multiplayer, with an optional later fast mode?
-5. Art plan: commission an artist, use VRoid-style base assets, or both?
-6. Minimum device spec to target?
+1. Landscape two-thumb layout as the default, or also a portrait one-hand mode?
+2. Minimum device: for example 4 GB RAM and a Snapdragon 7 class phone?
+3. Level cap and ability list for the first season?
+4. Are crews and ghost crowd the right MMO-lite features, or what else should feel MMO-like?
+5. How much terrain editing on home islands (soft tools only, or also objects and structures)?
+6. Art plan: who builds the first real avatar and base rigs?
 7. Keep the match-3 prototype as a minigame, or drop it?
-8. Public worlds non-editable and private worlds editable, as proposed?
