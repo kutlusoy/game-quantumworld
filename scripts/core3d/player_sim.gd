@@ -21,6 +21,12 @@ const DASH_COOLDOWN := 20
 const DASH_EXIT_SPEED := 162
 const GLIDE_FALL := 34
 const VOID_Y := -20 * FP
+const WATER_Y := 512
+const STEP_TOL := 130
+const SNAP := 300
+const SLOPE_NUM := 6
+const SLOPE_DEN := 5
+const GROUND_R := 0
 const SHARD_RADIUS := 900
 
 const BIT_JUMP := 1
@@ -59,9 +65,9 @@ func _init(w) -> void:
 	respawn()
 
 func respawn() -> void:
-	px = world.spawn.x * FP + FP / 2
-	py = world.spawn.y * FP
-	pz = world.spawn.z * FP + FP / 2
+	px = world.spawn.x
+	py = world.spawn.y
+	pz = world.spawn.z
 	vx = 0
 	vy = 0
 	vz = 0
@@ -100,58 +106,91 @@ static func approach(v: int, target: int, accel: int, friction: int) -> int:
 		return mini(v + step, target)
 	return maxi(v - step, target)
 
-func collides(x: int, y: int, z: int) -> bool:
-	var x0 := fdiv(x - HALF_W)
-	var x1 := fdiv(x + HALF_W - 1)
-	var z0 := fdiv(z - HALF_W)
-	var z1 := fdiv(z + HALF_W - 1)
-	var y0 := fdiv(y)
-	var y1 := fdiv(y + HEIGHT - 1)
-	for by in range(y0, y1 + 1):
-		for bz in range(z0, z1 + 1):
-			for bx in range(x0, x1 + 1):
-				if world.is_solid(bx, by, bz):
-					return true
+func ground_h(x: int, z: int) -> int:
+	return world.ground_at(x, z, GROUND_R)
+
+func _box_overlap(i: int, x: int, y: int, z: int) -> bool:
+	var bmin: Vector3i = world.box_min[i]
+	var bmax: Vector3i = world.box_max[i]
+	return x - HALF_W < bmax.x and x + HALF_W > bmin.x and z - HALF_W < bmax.z and z + HALF_W > bmin.z and y < bmax.y and y + HEIGHT > bmin.y
+
+func _box_hit(x: int, y: int, z: int) -> bool:
+	for i in world.box_min.size():
+		if _box_overlap(i, x, y, z):
+			return true
 	return false
+
+func _terrain_blocks(nx: int, nz: int, _ox: int, _oz: int, dist: int) -> bool:
+	var h_new := ground_h(nx, nz)
+	if h_new <= py + 2:
+		return false
+	if not grounded:
+		return h_new > py + STEP_TOL
+	return (h_new - py) * SLOPE_DEN > dist * SLOPE_NUM + 4 * SLOPE_DEN
 
 func _move_x(d: int) -> void:
 	if d == 0:
 		return
 	var nx := px + d
-	if not collides(nx, py, pz):
-		px = nx
+	var found := false
+	var limit := 0
+	for i in world.box_min.size():
+		if _box_overlap(i, nx, py, pz):
+			var c: int = (world.box_min[i].x - HALF_W) if d > 0 else (world.box_max[i].x + HALF_W)
+			if not found or (d > 0 and c < limit) or (d < 0 and c > limit):
+				limit = c
+				found = true
+	if found:
+		px = limit
+		vx = 0
 		return
-	if d > 0:
-		px = fdiv(nx + HALF_W - 1) * FP - HALF_W
-	else:
-		px = (fdiv(nx - HALF_W) + 1) * FP + HALF_W
-	vx = 0
+	if _terrain_blocks(nx, pz, px, pz, absi(d)):
+		vx = 0
+		return
+	px = nx
 
 func _move_z(d: int) -> void:
 	if d == 0:
 		return
 	var nz := pz + d
-	if not collides(px, py, nz):
-		pz = nz
+	var found := false
+	var limit := 0
+	for i in world.box_min.size():
+		if _box_overlap(i, px, py, nz):
+			var c: int = (world.box_min[i].z - HALF_W) if d > 0 else (world.box_max[i].z + HALF_W)
+			if not found or (d > 0 and c < limit) or (d < 0 and c > limit):
+				limit = c
+				found = true
+	if found:
+		pz = limit
+		vz = 0
 		return
-	if d > 0:
-		pz = fdiv(nz + HALF_W - 1) * FP - HALF_W
-	else:
-		pz = (fdiv(nz - HALF_W) + 1) * FP + HALF_W
-	vz = 0
+	if _terrain_blocks(px, nz, px, pz, absi(d)):
+		vz = 0
+		return
+	pz = nz
 
 func _move_y(d: int) -> void:
-	if d == 0:
-		return
-	var ny := py + d
-	if not collides(px, ny, pz):
-		py = ny
-		return
-	if d > 0:
-		py = fdiv(ny + HEIGHT - 1) * FP - HEIGHT
-	else:
-		py = (fdiv(ny) + 1) * FP
-	vy = 0
+	if d != 0:
+		var ny := py + d
+		var found := false
+		var limit := 0
+		for i in world.box_min.size():
+			if _box_overlap(i, px, ny, pz):
+				var c: int = (world.box_min[i].y - HEIGHT) if d > 0 else world.box_max[i].y
+				if not found or (d > 0 and c < limit) or (d < 0 and c > limit):
+					limit = c
+					found = true
+		if found:
+			py = limit
+			vy = 0
+		else:
+			py = ny
+	var g := ground_h(px, pz)
+	if py < g:
+		py = g
+		if vy < 0:
+			vy = 0
 
 func step(mx: int, mz: int, bits: int) -> Dictionary:
 	var ev := {"collected": [], "respawned": false, "jumped": false, "double_jumped": false, "dashed": false, "landed": false, "glide_started": false}
@@ -247,7 +286,12 @@ func step(mx: int, mz: int, bits: int) -> Dictionary:
 	_move_y(vy)
 
 	var was_grounded := grounded
-	grounded = vy <= 0 and collides(px, py - 1, pz)
+	var g := ground_h(px, pz)
+	var on_box := _box_hit(px, py - 2, pz)
+	if was_grounded and vy <= 0 and not on_box and not ev["jumped"] and py > g and py - g <= SNAP:
+		py = g
+	var on_terrain := py <= g + 8
+	grounded = vy <= 0 and (on_terrain or on_box)
 	if grounded:
 		jumps_left = 1
 		dash_charges = 1
@@ -255,7 +299,7 @@ func step(mx: int, mz: int, bits: int) -> Dictionary:
 		if not was_grounded:
 			ev["landed"] = true
 
-	if py < VOID_Y:
+	if py < WATER_Y:
 		respawn()
 		ev["respawned"] = true
 
