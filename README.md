@@ -1,10 +1,10 @@
 # Quantum World
 
-Android match-3 puzzle game built with Godot 4.3. Design documents are in `docs/`.
+Android game built with Godot 4.3: a 3D anime-style open-world platformer with block-based building. Design documents are in `docs/`; start with `docs/PLAN.md` and `docs/GAMEPLAY-3D.md`.
 
 ## Status
 
-Phase 1 vertical slice: match-3 core, special pieces, 20 levels, level select, local save data. Everything runs offline.
+The project direction changed from match-3 to a 3D open-world adventure. The repository currently contains the finished match-3 prototype (core logic, 20 levels, UI, tests), kept as a possible in-world minigame. The 3D vertical slice is the next phase.
 
 ## Run
 
@@ -24,11 +24,12 @@ godot --headless --path . -s tests/ui_smoke.gd
 
 ## Layout
 
-- `scripts/core/`: game logic without any scene dependency (board, level, session, replay, deterministic RNG)
-- `scripts/ui/`: views and screens
-- `levels/levels.json`: level definitions (seed, size, colors, moves, target score)
+- `scripts/core/`: match-3 logic without any scene dependency (board, level, session, replay, deterministic RNG)
+- `scripts/ui/`: match-3 views and screens
+- `levels/levels.json`: match-3 level definitions
 - `tests/`: headless logic and UI smoke tests
+- `docs/`: design documents
 
 ## Determinism
 
-A level plus its move list fully determines the result. `scripts/core/rng.gd` is a self-contained xorshift generator so replays give identical boards on every device and engine version. `scripts/core/replay.gd` verifies a move list and returns score, stars and a board fingerprint.
+A level plus its move list fully determines the result. `scripts/core/rng.gd` is a self-contained xorshift generator so replays give identical results on every device and engine version. The 3D game follows the same principle with a deterministic character controller (`docs/GAMEPLAY-3D.md`).
