@@ -9,7 +9,7 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 **Design pillars**
 1. **One-thumb play**: every action takes 1 to 2 taps, sessions last 2 to 5 minutes.
 2. **Reward every second**: colors, sound and particles on every move.
-3. **Anonymous by default**: no login, no email, no phone number.
+3. **Anonymous by default**: no login, no email, no phone number. Tor and I2P run invisibly in the background; players never see or configure anything technical.
 4. **Decentralized**: the game keeps working even if no server exists.
 5. **My universe**: progress becomes visible as a growing world of your own.
 
@@ -27,7 +27,7 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 **Reality checks**
 - **Tor/I2P on Android** is feasible (Tor via `tor-android`/Arti, I2P via `i2pd` or the I2P Android library). However, **latency is 300 ms to 2 s**, so **real-time action multiplayer is out**. The planned turn-based/asynchronous design fits this well.
 - **Google Play** allows Tor usage, but apps embedding Tor/I2P need a clean privacy statement. Alternative distribution: F-Droid, direct APK.
-- **Battery/data usage**: Tor/I2P in the background is expensive. Solution: **active only in the lobby and during sync**, levels themselves run offline.
+- **Battery/data usage**: Tor/I2P in the background is expensive. Solution: the network layer starts and stops automatically, **active only in the lobby and during sync**, levels themselves run offline. Android background limits (Doze, app standby) require a short-lived foreground service for sync.
 - **Fully serverless** is hard for peer discovery, cheat protection and moderation. Solution: a **hybrid** (see 4.3) with optional, replaceable bootstrap nodes but no central authority.
 - **Anonymous does not mean unmoderated**: children/teenagers and chat abuse are real concerns. Chat is emotes/stickers only by default, free text optional plus local block lists.
 
@@ -57,8 +57,9 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 
 ### 4.2 Transport
 - Every client publishes itself as a **Tor v3 onion service** and/or an **I2P destination**.
-- In the settings the user chooses: *Tor* / *I2P* / *Both* / *Direct (fast)*.
-- Default: Tor for the lobby, direct for nothing private.
+- **No user-facing transport settings.** An internal transport manager chooses automatically: it starts Tor and I2P in parallel, uses whichever connects first and keeps the other as a fallback. If both fail, the game stays fully playable offline and retries silently.
+- Direct connections are never used for anything that exposes an IP address.
+- An advanced/developer option may exist in a hidden menu, but is not part of the normal UI.
 
 ### 4.3 Discovery and Lobby without a Central Server
 - **DHT (Kademlia)** to find lobbies ("rooms") by hash (e.g. room "Sakura Plaza").
@@ -73,6 +74,14 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 
 ### 4.5 Data That Is Shared
 Only: public key, name, avatar parameters (~200 bytes), lobby position, signed level results, emotes. **No** device IDs, no IP (thanks to Tor/I2P), no analytics.
+
+### 4.6 Invisible Networking (UX rules)
+- The words "Tor", "I2P", "onion", "DHT", "peer" and "node" never appear in the normal UI. Neutral wording is used instead, e.g. "Connecting to the Nexus".
+- Startup: the network layer boots in the background (first connection can take 10 to 60 seconds) while the player is already playing the tutorial and first levels. Nothing blocks on the network.
+- Connection state is shown as one small, friendly icon (e.g. a glowing portal: closed, opening, open). No error dialogs, no technical messages.
+- Network failures degrade gracefully: lobby shows "Nexus is far away, try again later" and offers NPC avatars; progress is never lost.
+- Data usage and battery: sync only on Wi-Fi by default, a single toggle "Save data" in the settings.
+- Legal/store: the privacy policy and the store listing still describe the use of anonymizing networks in plain language, even though the in-game UI does not.
 
 ## 5. Gameplay Sketch
 
@@ -134,8 +143,8 @@ Without accounts, classic subscriptions/purchases are difficult. Options: one-ti
 | 0: Concept (2 to 3 weeks) | This plan, paper prototype sketches, engine decision | Go/No-Go |
 | 1: Vertical slice (2 to 3 months) | Match-3 core, 20 levels, world map, placeholder music, basic avatar | Playable APK prototype, fun test |
 | 2: Meta (2 to 3 months) | Universe building mode, progression, teleportation, 100+ levels, music | Single-player beta |
-| 3: Identity and P2P (3 months) | Key-based identity, Tor transport, DHT, lobby with 2 to 10 players | Test lobby |
-| 4: I2P, duels, raids (2 to 3 months) | I2P, asynchronous duels, trading, events | Open beta |
+| 3: Identity and P2P (3 months) | Key-based identity, automatic transport manager (Tor first), DHT, lobby with 2 to 10 players, invisible-networking UX | Test lobby |
+| 4: I2P, duels, raids (2 to 3 months) | I2P added to the transport manager, asynchronous duels, trading, events | Open beta |
 | 5: Launch and live operation | F-Droid/Play, community nodes, content updates | 1.0 |
 
 **Recommendation:** prove the fun first (phase 1), only then build the expensive networking. The network must never block fun: the game must be **fully playable offline**.
@@ -144,7 +153,7 @@ Without accounts, classic subscriptions/purchases are difficult. Options: one-ti
 
 | Risk | Mitigation |
 |---|---|
-| Tor/I2P too slow | Asynchronous mechanics only; caching; selectable direct mode |
+| Tor/I2P too slow | Asynchronous mechanics only; caching; automatic fallback between transports |
 | Few players -> empty lobby | Bots/NPC avatars, offline lobby simulation, events to concentrate players |
 | Abuse/chat | Emotes first, local block lists, report signals in gossip |
 | Store rejection | Privacy documentation, F-Droid alternative |
