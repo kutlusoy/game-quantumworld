@@ -34,6 +34,7 @@ var toast_time := 0.0
 var cam_pos := Vector3.ZERO
 var time := 0.0
 var is_touch := false
+var _g_down := false
 
 func _ready() -> void:
 	is_touch = DisplayServer.is_touchscreen_available()
@@ -147,7 +148,7 @@ func _build_hud() -> void:
 	toast_label = _hud_label(layer, Vector2(24, 100), 30)
 	if not is_touch:
 		var hint := _hud_label(layer, Vector2(24, 680), 20)
-		hint.text = "WASD move   Space jump (press again to double jump, hold to glide)   Shift dash   Q/E or mouse drag camera"
+		hint.text = "WASD move   Space jump (press again to double jump, hold to glide)   Shift dash   G happy   Q/E or mouse drag camera"
 
 func _hud_label(parent: Node, pos: Vector2, size: int) -> Label:
 	var l := Label.new()
@@ -231,6 +232,8 @@ func _on_collect(i: int) -> void:
 	p.emitting = true
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
 	_toast("Shard %d / %d" % [sim.collected_count, world.shards.size()])
+	if sim.grounded and Vector2(last_vel.x, last_vel.z).length() < 0.02:
+		avatar.happy()
 
 func _toast(text: String) -> void:
 	toast_label.text = text
@@ -249,6 +252,10 @@ func _process(delta: float) -> void:
 	var p := prev_pos.lerp(cur_pos, f)
 	avatar.position = p
 	avatar.update_pose(last_vel, sim.grounded, sim.gliding, sim.dash_ticks > 0, face, delta)
+	var g_now := Input.is_physical_key_pressed(KEY_G)
+	if (g_now and not _g_down) or touch.consume_emote():
+		avatar.happy()
+	_g_down = g_now
 	var cd: Vector2 = touch.consume_camera_delta()
 	yaw -= cd.x * 0.006
 	pitch = clampf(pitch + cd.y * 0.006, -0.3, 1.3)
