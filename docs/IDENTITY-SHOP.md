@@ -1,16 +1,16 @@
-# Quantum World: Shop, Persistent Addresses and Account Design (Draft v0.1)
+# Quantum World: Shop, Persistent Addresses and Account Design (Draft v0.2)
 
-Status: proposals for decision. Items marked "conflict" change earlier decisions in `SUSTAINABILITY.md`.
+Status: proposals for decision. Server-side parts are specified in `SERVER.md`. The conflict noted in section 1.1 is resolved by `SUSTAINABILITY.md`: Quanta stays unsold, Crystals are sold.
 
 ## 1. Shop and Game Admin Role
 
-### 1.1 Conflict with the closed-loop decision
-`SUSTAINABILITY.md` decided: Quanta is never sold for money. A direct Quanta sale by an admin reverses that. Consequences of selling the earned currency itself:
+### 1.1 Conflict with the closed-loop decision (resolved)
+`SUSTAINABILITY.md` decided: Quanta is never sold for money. A direct Quanta sale by an admin would reverse that. Consequences of selling the earned currency itself:
 - It becomes a purchasable token, which pulls the project into token-sale and e-money style regulation (for example MiCA in the EU) and into store rules on blockchain assets.
 - It breaks the economy math: money-bought Quanta competes with earned Quanta and inflates supply outside the event pools.
 - Players can no longer be told "you cannot buy it, you play for it".
 
-### 1.2 Recommended design: two currencies
+### 1.2 Design: two currencies
 | | **Quanta** | **Crystals** (working name) |
 |---|---|---|
 | Source | Earned by playing (event pools) | Sold by the Game Admin for money |
@@ -19,35 +19,32 @@ Status: proposals for decision. Items marked "conflict" change earlier decisions
 | Convertible to money | No | No, no refunds beyond legal minimum |
 | Effect on supply | Fixed emission schedule | Burned on spend, so no float builds up |
 
-The sale is of **Crystals (shop credit)**, a normal closed-loop premium currency. Quanta stays earn-only. This gives the admin a revenue stream, which is the funding answer from `SUSTAINABILITY.md` section 5, without turning the project into a token sale.
-
-If you still want to sell Quanta directly, get legal advice first and plan for the economy changes above.
+The sale is of **Crystals (shop credit)**, a normal closed-loop premium currency. Quanta stays earn-only.
 
 ### 1.3 The Shop
 - In the Nexus there is a Shop: avatar clothes and accessories, auras, emotes, universe decoration, world skins, music tracks.
-- The **catalogue** is a signed list (item id, name, price, currency, preview hash) published by the admin key and spread P2P by gossip. No web server needed.
+- The **catalogue** is a signed list (item id, name, price, currency, preview hash) published by the admin key and spread P2P by gossip. The server also serves it, but nothing depends on that.
 - Quanta-priced items are a **sink** that supports the economy. Crystal-priced items are premium cosmetics.
 - Bought items are non-transferable (soulbound) in v1. Cosmetics only, never gameplay power, never randomized paid loot boxes.
 
 ### 1.4 Admin role, limited by consensus
-- A **Shop Authority key** (ideally an m-of-n multisig, with key rotation through a scheduled protocol upgrade) is recognised by consensus for exactly three actions: publish catalogue entries, issue Crystals to an account, issue shop items.
+- A **Shop Authority key** (m-of-n multisig, with key rotation through a scheduled protocol upgrade) is recognised by consensus for exactly three actions: publish catalogue entries, issue Crystals to an account, issue shop items. A fourth limited action `RevokeIssue` for refunds is proposed in `SERVER.md` section 6.
 - It **cannot** change balances, take items, change game rules, mint Quanta or halt the chain. The protocol rejects such transactions.
-- If the admin misbehaves or disappears, the chain and game continue. Players can fork or rotate the authority through a protocol upgrade. This is the honest limit of a decentralized system: the admin is trusted only for the shop.
+- If the admin misbehaves or disappears, the chain and game continue. Players can fork or rotate the authority through a protocol upgrade.
 
-### 1.5 Payment flow without a central game server
-Selling for money needs someone to confirm a payment and then sign a Crystal issue. That is the **one centralized component**, and it stays optional:
+### 1.5 Payment flow
+Selling for money needs someone to confirm a payment and then sign a Crystal issue. This is the optional Shop service in `SERVER.md`:
 1. Player buys Crystals through the store's billing (or another payment method).
-2. A **Shop Keeper service**, run by the admin (can be an onion service), verifies the purchase with the payment provider and signs `IssueCrystals(account, amount, receipt_ref)`.
-3. Keepers on the chain verify the admin signature and apply it.
-If the Shop Keeper is offline, only purchases pause. Playing, earning, trading and the Shop's Quanta items continue.
+2. The Shop service verifies the purchase with the payment provider and prepares `IssueCrystals(account, amount, receipt_ref)`, signed by the multisig.
+3. Keepers verify the signature and apply it.
+If the Shop service is offline, only purchases pause.
 
-Store policy notes (verify before building): Google Play generally requires its own billing for digital goods, with its fee. F-Droid builds cannot use Play billing, so they would offer donations or a separate payment option. Selling virtual currency also brings consumer law duties (clear pricing, minors, refund rules) and tax duties for the admin.
+Store policy notes (verify before building): Google Play generally requires its own billing for digital goods, with its fee. F-Droid builds cannot use Play billing, so they would offer donations or a separate payment option. Selling virtual currency also brings consumer law duties and tax duties for the admin.
 
 ## 2. Persistent Tor and I2P Addresses
 
-Yes, this makes sense. Proposed:
 - Each install generates a long-term **onion service key** and **I2P destination key**, stored encrypted on the device. The addresses stay the same across restarts.
-- A **signed address record** `(identity pubkey, onion address, i2p address, sequence number, expiry)` is published in the DHT and spread in the lobby. Peers verify the signature, so an address cannot be hijacked.
+- A **signed address record** `(identity pubkey, onion address, i2p address, sequence number, expiry)` is published in the DHT, spread in the lobby and served by bootstrap endpoints. Peers verify the signature, so an address cannot be hijacked.
 - Every client keeps a **peer book** of last-seen peers and their addresses, plus Tor guard persistence, so reconnecting after a restart does not repeat full discovery.
 - Bootstrap list entries are also persistent addresses.
 
@@ -56,44 +53,44 @@ Tradeoffs to accept:
 - Phones are often offline, so onion services on phones are reachable only while the app is active. Peers cache the record and retry; Keepers and always-on nodes do the real relaying.
 - Keeping an onion service published costs battery. Publish only when the lobby or sync is active (see `PLAN.md` section 4.6).
 
-## 3. Account Design: email + password hash?
+## 3. Accounts and Recovery (target group: age 12 and up)
 
-### 3.1 Assessment
-The goal (a stable ID, nickname for display, everything else via the derived ID) is right. The mechanism "hash(email + password + salt) = ID" has real problems in a system with no server:
+### 3.1 Why not a 12-word seed, and why not email + password as identity
+A 12-word phrase is too complex for children from 12. Deriving the ID from `hash(email + password + salt)` is weak: the ID is public, so weak passwords can be guessed offline; the salt cannot stay secret; there is no recovery; typos silently create a new empty account. Kids also choose weak passwords. So the identity stays a random key, and recovery is layered and mostly invisible.
 
-1. **The ID is public.** Everyone can see it. An attacker can guess email and password combinations offline and compare the result with the public ID. This is the brain-wallet attack. Weak passwords are cracked quickly, and the account holds balance and items.
-2. **A salt cannot stay secret.** To log in on a new device the salt must be reproducible, so it is effectively a fixed app constant. It does not stop targeted guessing. A per-user random salt would have to be stored somewhere, which needs a server or the device itself.
-3. **No recovery.** There is no server to send a reset mail. Forgotten password means lost account.
-4. **Silent typo accounts.** A mistyped email or password produces a different valid ID, so the player lands in a fresh empty account without any error.
-5. **The email adds almost no secrecy** (it is guessable or known to the attacker) and nothing verifies it. It would only be an extra input the user must remember.
+### 3.2 Recovery levels
+| Level | What the player does | Notes |
+|---|---|---|
+| **0: Automatic** | Nothing | The key lives in the Android Keystore and is included in the OS's encrypted backup. A new phone restores it during setup. Needs Android backup enabled |
+| **1: Phone transfer** | Scan a QR code from the old phone | Takes seconds, no words. Also an encrypted export file |
+| **2: Rescue card (optional)** | Save an image with a QR code and a 20-character code such as `K7M2-9QXA-4TPW-H8DN-3RZV` | Random code, strong, easy to screenshot or print |
+| **3: Trusted people (optional)** | 2 of 3 chosen friends or a parent approve recovery | Good fit for ages 12 to 15 |
+| **4: Optional recovery account** | Email (optional) + password to protect an encrypted backup on the server | See `SERVER.md` section 7; no mandatory accounts |
+| **Later: PIN recovery** | 6-digit PIN protects a backup split across Keepers, with attempt limits | Cryptographically complex, later phase |
 
-Your observation "same email, different password gives a different user" is correct and is exactly what causes points 3 and 4.
-
-### 3.2 Recommended design
-- **Primary: random seed phrase.** The device generates a key pair from a random 12-word phrase (about 128 bits of entropy). That key is the account. The phrase is shown once for backup. A local **PIN or biometric lock** protects it on the device. Nothing to crack offline.
-- **Optional convenience login (email + password), strengthened:**
-  - Derive the key with **Argon2id** (memory at least 64 MiB, tuned to about 1 s on a mid-range phone) from `email + password` with an app-specific domain separator.
-  - Enforce high entropy: a generated passphrase of 5 or more random words, or a long random password. Reject weak passwords outright.
-  - Warn clearly: lose the passphrase and the account is gone. Do not store or transmit the email anywhere.
-  - Add a **confirmation step on first creation** (type the passphrase twice and show a short ID fingerprint) to avoid silent typo accounts.
-  - Even so, a derived key is weaker than a random seed. Treat it as a second option.
-- **Device transfer** by QR code, as already planned.
+Purchases: paid Crystals and items are the real value at risk. Support can verify a rescue through the store's order history (see `SERVER.md`). This is a support path, not an automatic one.
 
 ### 3.3 Nickname and public ID
 - Public identity is the **public key**; its short fingerprint is the real ID. Players never see it unless they choose to share it.
-- **Nickname** is chosen by the player and shown in the game. Uniqueness has two options:
-  1. **Unique on-chain nickname:** a `Name(nickname, owner)` leaf, first come first served, small Quanta fee as a sink, verified by Keepers. Fits the ledger design and still needs no central server.
-  2. **Non-unique with tag:** `Nickname#4821` from the fingerprint, free, no registration.
+- **Nickname** is chosen by the player. Uniqueness has two options:
+  1. **Unique on-chain nickname:** a `Name(nickname, owner)` leaf, first come first served, small Quanta fee as a sink, verified by Keepers.
+  2. **Non-unique with tag:** `Nickname#4821` from the fingerprint, free.
   Recommendation: both. Free tagged nickname by default, optional paid unique name.
-- Nicknames pass a local profanity filter. Reports and block lists use the key, not the nickname.
+- Nicknames pass a local profanity filter plus a signed blocklist from the server. Reports and block lists use the key, not the nickname.
+
+### 3.4 Minors (12 and up)
+- Consent age for data processing varies by country (13 to 16); the game collects very little personal data, but have it reviewed.
+- Purchases only through store billing, using family controls and parental approval, plus a spending limit.
+- Chat: emotes only for players under 16.
+- Age rating through the store's rating process.
 
 ## 4. Impact on Other Documents
-- `SUSTAINABILITY.md` decision 1 and section 5: update to the two-currency model if you agree; otherwise stays closed-loop with no premium currency.
-- `CHAIN-DESIGN.md`: add leaves `Crystals(account, balance)`, `ShopItem(item_id, owner)`, `Name(nickname, owner)` and the three Shop Authority transaction types.
-- `PLAN.md` sections 4.1 and 4.3: account creation and persistent address records as described above.
+- `SUSTAINABILITY.md`: decision 2 and the infrastructure table now include optional servers.
+- `CHAIN-DESIGN.md`: leaves `Crystals`, `ShopItem`, `Name` and Shop Authority transactions are already included; add `RevokeIssue` once agreed.
+- `PLAN.md` sections 4.1 and 4.3: account creation per section 3, persistent address records per section 2.
 
 ## 5. Open Questions
-1. Do you accept two currencies (earn-only Quanta plus sold Crystals), or do you want to sell Quanta itself despite the legal and economy risks?
-2. Who runs the Shop Keeper service and the Shop Authority key, and should it be multisig from the start?
-3. Seed phrase as the default and email + password only as an optional strong-passphrase login, as recommended?
+1. Who runs the Shop service and holds the Shop Authority key shares; multisig from the start?
+2. Accept the recovery levels above (automatic backup as the default, seed phrase dropped)?
+3. Optional recovery account (recommended) or mandatory accounts?
 4. Unique paid nicknames, tagged free nicknames, or both?
