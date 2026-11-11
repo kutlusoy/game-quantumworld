@@ -1,6 +1,6 @@
 extends SceneTree
 
-const VoxelWorld = preload("res://scripts/core3d/voxel_world.gd")
+const TerrainWorld = preload("res://scripts/core3d/terrain_world.gd")
 const PlayerSim = preload("res://scripts/core3d/player_sim.gd")
 const Replay3D = preload("res://scripts/core3d/replay3d.gd")
 const Rng = preload("res://scripts/core/rng.gd")
@@ -17,26 +17,76 @@ func check(cond: bool, msg: String) -> void:
 		print("FAIL: ", msg)
 
 func flat_sim():
-	var w = VoxelWorld.new(1, 4)
+	var w = TerrainWorld.new(1, 4)
 	var s = PlayerSim.new(w)
 	for i in 10:
 		s.step(0, 0, 0)
 	return s
 
 func test_worldgen() -> void:
-	var a = VoxelWorld.new(77)
-	var b = VoxelWorld.new(77)
-	var c = VoxelWorld.new(78)
+	var a = TerrainWorld.new(77)
+	var b = TerrainWorld.new(77)
+	var c = TerrainWorld.new(78)
 	check(a.fingerprint() == b.fingerprint(), "worldgen deterministic")
 	check(a.fingerprint() != c.fingerprint(), "worldgen seed sensitive")
 	check(a.shards == b.shards, "shards deterministic")
 	check(a.shards.size() >= 50, "at least 50 shards, got %d" % a.shards.size())
 	for i in a.shards.size():
 		var s: Vector3i = a.shards[i]
-		check(a.get_block(s.x, s.y, s.z) == VoxelWorld.AIR, "shard %d not inside a block" % i)
+		var g: int = a.height_at(s.x, s.y)
+		check(s.y > g or g == TerrainWorld.VOID, "shard %d above the ground" % i)
+		var inside := false
+		for k in a.box_min.size():
+			if s.x > a.box_min[k].x and s.x < a.box_max[k].x and s.y > a.box_min[k].y and s.y < a.box_max[k].y and s.z > a.box_min[k].z and s.z < a.box_max[k].z:
+				inside = true
+		check(not inside, "shard %d not inside a box" % i)
 	var sp: Vector3i = a.spawn
-	check(a.is_solid(sp.x, sp.y - 1, sp.z), "spawn stands on a block")
-	check(not a.is_solid(sp.x, sp.y, sp.z) and not a.is_solid(sp.x, sp.y + 1, sp.z), "spawn has headroom")
+	check(a.height_at(sp.x, sp.z) == sp.y, "spawn stands on the terrain")
+	check(a.height_at(sp.x, sp.z) > TerrainWorld.SEA, "spawn is above sea level")
+	check(a.trees.size() > 30, "trees placed")
+
+func test_slopes() -> void:
+	var w = TerrainWorld.new(1, 4)
+	for z in range(0, TerrainWorld.D + 1):
+		for x in range(40, TerrainWorld.W + 1):
+			w.hv[w.vidx(x, z)] = 4 * 1024 + (x - 40) * 1024
+	var s = PlayerSim.new(w)
+	s.set_position(Vector3i(36 * 1024, 4 * 1024, 32 * 1024))
+	for i in 10:
+		s.step(0, 0, 0)
+	for i in 160:
+		s.step(100, 0, 0)
+	check(s.px > 44 * 1024, "45 degree slope is walkable, x=%d" % s.px)
+	check(s.grounded, "grounded while climbing")
+	var w2 = TerrainWorld.new(1, 4)
+	for z in range(0, TerrainWorld.D + 1):
+		for x in range(40, TerrainWorld.W + 1):
+			w2.hv[w2.vidx(x, z)] = 4 * 1024 + (x - 40) * 3 * 1024
+	var s2 = PlayerSim.new(w2)
+	s2.set_position(Vector3i(36 * 1024, 4 * 1024, 32 * 1024))
+	for i in 10:
+		s2.step(0, 0, 0)
+	for i in 160:
+		s2.step(100, 0, 0)
+	check(s2.px < 41 * 1024, "steep slope blocks the player, x=%d" % s2.px)
+	var s3 = PlayerSim.new(w)
+	s3.set_position(Vector3i(60 * 1024, 4 * 1024 + 20 * 1024, 32 * 1024))
+	for i in 200:
+		s3.step(-100, 0, 0)
+	check(s3.px < 52 * 1024 and s3.grounded, "walking downhill keeps the player grounded, x=%d" % s3.px)
+
+func test_sea() -> void:
+	var w = TerrainWorld.new(5)
+	var s = PlayerSim.new(w)
+	s.set_position(Vector3i(5 * 1024, 20 * 1024, 5 * 1024))
+	var respawned := false
+	for i in 400:
+		var ev: Dictionary = s.step(0, 0, 0)
+		if ev["respawned"]:
+			respawned = true
+			break
+	check(respawned, "falling into the sea respawns")
+	check(s.px == w.spawn.x, "respawn at spawn")
 
 func test_basic_physics() -> void:
 	var s = flat_sim()
@@ -49,17 +99,31 @@ func test_basic_physics() -> void:
 	check(absi(s.vz) <= PlayerSim.RUN_SPEED, "speed capped")
 
 func test_wall() -> void:
-	var w = VoxelWorld.new(1, 4)
-	for y in range(4, 8):
-		for x in range(0, 64):
-			w.set_block(x, y, 40, VoxelWorld.STONE)
+	var w = TerrainWorld.new(1, 4)
+	w.add_box(Vector3i(0, 4 * 1024, 40 * 1024), Vector3i(96 * 1024, 8 * 1024, 41 * 1024), "ruin")
 	var s = PlayerSim.new(w)
 	for i in 10:
 		s.step(0, 0, 0)
 	for i in 200:
-		s.step(0, 100, 0)
-	check(s.pz < 40 * 1024, "wall blocks the player")
-	check(s.pz == 40 * 1024 - PlayerSim.HALF_W, "player rests against wall exactly, z=%d" % s.pz)
+		s.step(0, -100, 0)
+	check(s.pz > 41 * 1024, "wall blocks the player")
+	check(s.pz == 41 * 1024 + PlayerSim.HALF_W, "player rests against wall exactly, z=%d" % s.pz)
+	var w2 = TerrainWorld.new(1, 4)
+	w2.add_box(Vector3i(30 * 1024, 4 * 1024, 30 * 1024), Vector3i(36 * 1024, 5 * 1024, 36 * 1024), "crystal")
+	var s2 = PlayerSim.new(w2)
+	s2.set_position(Vector3i(33 * 1024, 7 * 1024, 33 * 1024))
+	for i in 60:
+		s2.step(0, 0, 0)
+	check(s2.py == 5 * 1024 and s2.grounded, "player lands on a box, y=%d" % s2.py)
+	var w3 = TerrainWorld.new(1, 4)
+	w3.add_box(Vector3i(30 * 1024, 6 * 1024, 30 * 1024), Vector3i(36 * 1024, 7 * 1024, 36 * 1024), "crystal")
+	var s3 = PlayerSim.new(w3)
+	s3.set_position(Vector3i(33 * 1024, 4 * 1024, 33 * 1024))
+	for i in 3:
+		s3.step(0, 0, 0)
+	for i in 30:
+		s3.step(0, 0, 1)
+	check(s3.py + PlayerSim.HEIGHT <= 6 * 1024, "head stops under a ceiling box, y=%d" % s3.py)
 
 func jump_apex(held_ticks: int, second_press_at: int = -1) -> float:
 	var s = flat_sim()
@@ -124,11 +188,10 @@ func test_glide() -> void:
 	check(s.vy < -PlayerSim.GLIDE_FALL, "free fall is faster than glide")
 
 func ledge_sim():
-	var w = VoxelWorld.new(1, 4)
-	for y in range(0, 4):
-		for z in range(0, 64):
-			for x in range(34, 64):
-				w.set_block(x, y, z, VoxelWorld.AIR)
+	var w = TerrainWorld.new(1, 4)
+	for z in range(0, TerrainWorld.D + 1):
+		for x in range(35, TerrainWorld.W + 1):
+			w.hv[w.vidx(x, z)] = 0
 	var s = PlayerSim.new(w)
 	s.set_position(Vector3i(30 * 1024, 4 * 1024, 32 * 1024))
 	for i in 10:
@@ -165,21 +228,8 @@ func test_jump_buffer() -> void:
 			jumped = true
 	check(jumped, "buffered jump fires on landing")
 
-func test_void_respawn() -> void:
-	var w = VoxelWorld.new(5)
-	var s = PlayerSim.new(w)
-	s.set_position(Vector3i(5 * 1024, 20 * 1024, 5 * 1024))
-	var respawned := false
-	for i in 400:
-		var ev: Dictionary = s.step(0, 0, 0)
-		if ev["respawned"]:
-			respawned = true
-			break
-	check(respawned, "falling into the void respawns")
-	check(s.px == w.spawn.x * 1024 + 512, "respawn at spawn")
-
 func test_shard_collect() -> void:
-	var w = VoxelWorld.new(9)
+	var w = TerrainWorld.new(9)
 	var s = PlayerSim.new(w)
 	var c: Vector3i = w.shard_center(0)
 	s.set_position(Vector3i(c.x, c.y - PlayerSim.HEIGHT / 2, c.z))
@@ -241,22 +291,25 @@ func test_layout() -> void:
 	print("reach single=%.2f double=%.2f dash+double=%.2f" % [single, dbl, dash])
 	check(single < dbl and dbl < dash, "reach grows with abilities")
 	check(1.0 < single, "tower gap of 1 block is reachable with a single jump")
-	check(VoxelWorld.CHAIN_GAP > dbl - 0.2, "dash chain gap needs a dash (gap %d, double reach %.2f)" % [VoxelWorld.CHAIN_GAP, dbl])
-	check(VoxelWorld.CHAIN_GAP < dash - 1.0, "dash chain gap is reachable with margin (gap %d, reach %.2f)" % [VoxelWorld.CHAIN_GAP, dash])
-	var w = VoxelWorld.new(1)
-	for i in VoxelWorld.TOWER_PLATFORMS - 1:
+	check(TerrainWorld.CHAIN_GAP > dbl - 0.2, "dash chain gap needs a dash (gap %d, double reach %.2f)" % [TerrainWorld.CHAIN_GAP, dbl])
+	check(TerrainWorld.CHAIN_GAP < dash - 1.0, "dash chain gap is reachable with margin (gap %d, reach %.2f)" % [TerrainWorld.CHAIN_GAP, dash])
+	var w = TerrainWorld.new(1)
+	for i in TerrainWorld.TOWER_PLATFORMS - 1:
 		var p: Vector3i = w.tower_platform(i)
 		var q: Vector3i = w.tower_platform(i + 1)
 		check(q.y - p.y == 1, "tower steps up by one block")
 		var gx := maxi(absi(q.x - p.x) - 2, 0)
 		var gz := maxi(absi(q.z - p.z) - 2, 0)
 		check(maxf(gx, gz) <= 1.0, "tower gap %d,%d between %d and %d" % [gx, gz, i, i + 1])
+	var first: Vector3i = w.tower_platform(0)
+	var base_h: int = w.height_at(first.x * 1024 + 1024, first.z * 1024 + 1024)
+	check(absi(base_h - TerrainWorld.TOWER_BASE * 1024) < 200, "tower base is flattened, h=%d" % base_h)
 	var found := 0
-	for i in VoxelWorld.CHAIN_ISLANDS:
+	for i in TerrainWorld.CHAIN_ISLANDS:
 		var p: Vector3i = w.chain_island(i)
-		if p.z >= 1 and w.get_block(p.x, p.y, p.z) == VoxelWorld.CRYSTAL:
+		if p.z >= 1:
 			found += 1
-	check(found == VoxelWorld.CHAIN_ISLANDS, "all chain islands exist (%d)" % found)
+	check(found == TerrainWorld.CHAIN_ISLANDS, "all chain islands fit in the world (%d)" % found)
 
 func _init() -> void:
 	var t0 := Time.get_ticks_msec()
@@ -268,7 +321,8 @@ func _init() -> void:
 	test_glide()
 	test_coyote()
 	test_jump_buffer()
-	test_void_respawn()
+	test_sea()
+	test_slopes()
 	test_shard_collect()
 	test_replay()
 	test_layout()

@@ -1,11 +1,15 @@
 extends Node3D
 
-const VoxelWorld = preload("res://scripts/core3d/voxel_world.gd")
+const TerrainWorld = preload("res://scripts/core3d/terrain_world.gd")
 const PlayerSim = preload("res://scripts/core3d/player_sim.gd")
-const ChunkMesher = preload("res://scripts/world3d/chunk_mesher.gd")
+const TerrainMesher = preload("res://scripts/world3d/terrain_mesher.gd")
 const TouchControls = preload("res://scripts/world3d/touch_controls.gd")
 const AnimeAvatar = preload("res://scripts/world3d/anime_avatar.gd")
 const AvatarPresets = preload("res://scripts/world3d/avatar_presets.gd")
+const Challenge = preload("res://scripts/core3d/challenge.gd")
+const ChallengeTracker = preload("res://scripts/core3d/challenge_tracker.gd")
+const Progress = preload("res://scripts/core3d/progress.gd")
+const SaveStore = preload("res://scripts/core/save_store.gd")
 
 const FP := 1024.0
 const WORLD_SEED := 20241111
@@ -35,15 +39,26 @@ var cam_pos := Vector3.ZERO
 var time := 0.0
 var is_touch := false
 var _g_down := false
+var tracker
+var progress
+var save_data := {}
+var ring_finish: Array = []
+var level_label: Label
+var xp_bar: ProgressBar
+var chal_label: Label
 
 func _ready() -> void:
 	is_touch = DisplayServer.is_touchscreen_available()
 	var t0 := Time.get_ticks_msec()
-	world = VoxelWorld.new(WORLD_SEED)
+	world = TerrainWorld.new(WORLD_SEED)
 	sim = PlayerSim.new(world)
+	save_data = SaveStore.load_progress()
+	progress = Progress.from_dict(save_data)
+	tracker = ChallengeTracker.new(Challenge.list_for(world))
 	_build_environment()
 	_build_world_meshes()
 	_build_shards()
+	_build_rings()
 	AnimeAvatar.light_dir = sun.basis.z
 	avatar = AnimeAvatar.new()
 	avatar.build(AvatarPresets.get_preset(AVATAR_PRESET))
@@ -89,16 +104,81 @@ func _build_environment() -> void:
 	sun.shadow_enabled = false
 	add_child(sun)
 
-func _build_world_meshes() -> void:
+func _toon_mat(tint: Color) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/toon_voxel.gdshader")
 	mat.set_shader_parameter("light_dir", sun.basis.z)
-	for cz in range(world.D / ChunkMesher.CHUNK):
-		for cx in range(world.W / ChunkMesher.CHUNK):
+	mat.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
+	return mat
+
+func _build_world_meshes() -> void:
+	var mat := _toon_mat(Color.WHITE)
+	for cz in range(TerrainWorld.D / TerrainMesher.CHUNK):
+		for cx in range(TerrainWorld.W / TerrainMesher.CHUNK):
 			var mi := MeshInstance3D.new()
-			mi.mesh = ChunkMesher.build(world, cx, cz)
+			mi.mesh = TerrainMesher.build(world, cx, cz)
 			mi.material_override = mat
 			add_child(mi)
+	var kinds := {"crystal": Color("86e2ff"), "wood": Color("9a6b3f"), "ruin": Color("b9aed0")}
+	var mats := {}
+	for k in kinds:
+		mats[k] = _toon_mat(kinds[k])
+	for i in world.box_min.size():
+		var bmin := Vector3(world.box_min[i]) / FP
+		var bmax := Vector3(world.box_max[i]) / FP
+		var bm := BoxMesh.new()
+		bm.size = bmax - bmin
+		var bi := MeshInstance3D.new()
+		bi.mesh = bm
+		bi.position = (bmin + bmax) * 0.5
+		bi.material_override = mats[world.box_kind[i]]
+		add_child(bi)
+	var water := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(600, 600)
+	water.mesh = pm
+	water.position = Vector3(TerrainWorld.W / 2.0, TerrainWorld.SEA / FP, TerrainWorld.D / 2.0)
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.25, 0.6, 0.95, 0.78)
+	wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	water.material_override = wm
+	add_child(water)
+	_build_trees()
+
+func _build_trees() -> void:
+	var n: int = world.trees.size()
+	if n == 0:
+		return
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.12
+	trunk.bottom_radius = 0.16
+	trunk.height = 1.3
+	var crown := CylinderMesh.new()
+	crown.top_radius = 0.0
+	crown.bottom_radius = 0.9
+	crown.height = 2.2
+	var tm := MultiMesh.new()
+	tm.transform_format = MultiMesh.TRANSFORM_3D
+	tm.mesh = trunk
+	tm.instance_count = n
+	var cm := MultiMesh.new()
+	cm.transform_format = MultiMesh.TRANSFORM_3D
+	cm.mesh = crown
+	cm.instance_count = n
+	for i in n:
+		var p := Vector3(world.trees[i]) / FP
+		var sc := 0.8 + float(TerrainWorld.hash3(i, 5, 3) & 255) / 255.0 * 0.6
+		tm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sc, sc, sc)), p + Vector3(0, 0.65 * sc, 0)))
+		cm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sc, sc, sc)), p + Vector3(0, 2.0 * sc, 0)))
+	var ti := MultiMeshInstance3D.new()
+	ti.multimesh = tm
+	ti.material_override = _toon_mat(Color("8a5a3c"))
+	add_child(ti)
+	var ci := MultiMeshInstance3D.new()
+	ci.multimesh = cm
+	ci.material_override = _toon_mat(Color("4fcf6a"))
+	add_child(ci)
 
 func _shard_mesh() -> ArrayMesh:
 	var top := Vector3(0, 0.45, 0)
@@ -146,9 +226,103 @@ func _build_hud() -> void:
 	info_label = _hud_label(layer, Vector2(24, 18), 34)
 	fps_label = _hud_label(layer, Vector2(24, 62), 22)
 	toast_label = _hud_label(layer, Vector2(24, 100), 30)
+	level_label = _hud_label(layer, Vector2(1010, 18), 34)
+	xp_bar = ProgressBar.new()
+	xp_bar.position = Vector2(1010, 66)
+	xp_bar.size = Vector2(246, 16)
+	xp_bar.max_value = 1.0
+	xp_bar.show_percentage = false
+	layer.add_child(xp_bar)
+	chal_label = _hud_label(layer, Vector2(24, 150), 28)
 	if not is_touch:
 		var hint := _hud_label(layer, Vector2(24, 680), 20)
 		hint.text = "WASD move   Space jump (press again to double jump, hold to glide)   Shift dash   G happy   Q/E or mouse drag camera"
+
+func _ring_node(center: Vector3i, radius: int, color: Color) -> Node3D:
+	var root_n := Node3D.new()
+	root_n.position = Vector3(center) / FP
+	var beam := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	var r := radius / FP
+	cm.top_radius = r
+	cm.bottom_radius = r
+	cm.height = 3.0
+	beam.mesh = cm
+	beam.position = Vector3(0, 1.5, 0)
+	var bm := StandardMaterial3D.new()
+	bm.albedo_color = Color(color.r, color.g, color.b, 0.16)
+	bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	beam.material_override = bm
+	root_n.add_child(beam)
+	var disc := MeshInstance3D.new()
+	var dm := CylinderMesh.new()
+	dm.top_radius = r
+	dm.bottom_radius = r
+	dm.height = 0.06
+	disc.mesh = dm
+	var dmat := StandardMaterial3D.new()
+	dmat.albedo_color = Color(color.r, color.g, color.b, 0.6)
+	dmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	disc.material_override = dmat
+	root_n.add_child(disc)
+	add_child(root_n)
+	return root_n
+
+func _build_rings() -> void:
+	for c in tracker.list:
+		_ring_node(c.start, c.radius, Color("5dff9a"))
+		if c.kind == "parkour":
+			var fr := _ring_node(c.finish, c.radius, Color("ffd24d"))
+			fr.visible = false
+			ring_finish.append(fr)
+		else:
+			ring_finish.append(null)
+
+func _save() -> void:
+	save_data["xp"] = progress.xp
+	save_data["tiers"] = progress.tiers
+	SaveStore.save_progress(save_data)
+
+func _award_xp(n: int) -> void:
+	var gained: int = progress.add_xp(n)
+	if gained > 0:
+		_toast("Level %d!" % progress.level())
+		avatar.celebrate(3)
+
+func _handle_challenge(events: Array) -> void:
+	for e in events:
+		var ch = null
+		for c in tracker.list:
+			if c.id == e["id"]:
+				ch = c
+		match e["type"]:
+			"start":
+				_toast("%s: go!" % ch.title)
+				var idx: int = tracker.list.find(ch)
+				for k in ring_finish.size():
+					if ring_finish[k] != null:
+						ring_finish[k].visible = (k == idx)
+			"finish":
+				_hide_finish_rings()
+				var tier: int = e["tier"]
+				var names := ["GOLD", "SILVER", "BRONZE", "DONE"]
+				var gain: int = progress.record_tier(ch.id, tier)
+				_toast("%s %s  %.1fs  +%d XP" % [ch.title, names[tier], float(e["ticks"]) / 60.0, gain])
+				_award_xp(gain)
+				if tier <= 2:
+					avatar.celebrate(3 - tier)
+				_save()
+			"fail":
+				_hide_finish_rings()
+				_toast("%s failed" % ch.title)
+
+func _hide_finish_rings() -> void:
+	for r in ring_finish:
+		if r != null:
+			r.visible = false
 
 func _hud_label(parent: Node, pos: Vector2, size: int) -> Label:
 	var l := Label.new()
@@ -205,6 +379,7 @@ func _physics_process(_delta: float) -> void:
 		face = Vector2(frame[0], frame[1])
 	for i in ev["collected"]:
 		_on_collect(i)
+	_handle_challenge(tracker.update(sim, ev))
 
 func _on_collect(i: int) -> void:
 	var node: Node3D = shard_nodes[i]
@@ -232,8 +407,14 @@ func _on_collect(i: int) -> void:
 	p.emitting = true
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
 	_toast("Shard %d / %d" % [sim.collected_count, world.shards.size()])
-	if sim.grounded and Vector2(last_vel.x, last_vel.z).length() < 0.02:
-		avatar.happy()
+	var seen: Array = save_data.get("shard_xp", [])
+	if not seen.has(i):
+		seen.append(i)
+		save_data["shard_xp"] = seen
+		_award_xp(Progress.SHARD_XP)
+		_save()
+	if sim.collected_count % 10 == 0:
+		avatar.celebrate(1)
 
 func _toast(text: String) -> void:
 	toast_label.text = text
@@ -274,6 +455,13 @@ func _process(delta: float) -> void:
 			n.rotation.y = time * 2.0 + i
 			n.position.y = world.shard_center(i).y / FP + sin(time * 2.5 + i) * 0.08
 	info_label.text = "Shards %d / %d" % [sim.collected_count, world.shards.size()]
+	level_label.text = "Level %d" % progress.level()
+	xp_bar.value = progress.level_fraction()
+	var act = tracker.active_challenge()
+	if act != null:
+		chal_label.text = "%s  %.1fs   (gold %.0fs)" % [act.title, float(tracker.ticks) / 60.0, float(act.par[0]) / 60.0]
+	else:
+		chal_label.text = ""
 	fps_label.text = "%d fps" % Engine.get_frames_per_second()
 	toast_time -= delta
 	if toast_time <= 0.0:
@@ -286,7 +474,8 @@ func _update_camera(p: Vector3, delta: float) -> void:
 	var steps := int(dist / 0.3)
 	for i in range(1, steps + 1):
 		var pt := target + dir * (i * 0.3)
-		if world.get_block(floori(pt.x), floori(pt.y), floori(pt.z)) != VoxelWorld.AIR:
+		var h: int = world.height_at(int(pt.x * FP), int(pt.z * FP))
+		if h != TerrainWorld.VOID and pt.y * FP < h + 220.0:
 			d = maxf((i - 1) * 0.3 - 0.2, 0.8)
 			break
 	var desired := target + dir * d
