@@ -96,9 +96,10 @@ func _build_ui() -> void:
 	name_edit.text_changed.connect(func(t: String) -> void: cfg["name"] = t)
 	panel_box.add_child(name_edit)
 
-	var presets := HBoxContainer.new()
-	presets.add_theme_constant_override("separation", 6)
-	for i in 5:
+	var presets := HFlowContainer.new()
+	presets.add_theme_constant_override("h_separation", 6)
+	presets.add_theme_constant_override("v_separation", 6)
+	for i in Config.PRESET_COUNT:
 		var b := _button(Config.from_preset(i)["name"], 22)
 		b.custom_minimum_size = Vector2(90, 56)
 		b.pressed.connect(_on_preset.bind(i))
