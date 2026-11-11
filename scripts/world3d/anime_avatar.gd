@@ -1,6 +1,7 @@
 extends Node3D
 
 const MeshKit = preload("res://scripts/world3d/mesh_kit.gd")
+const Outfit = preload("res://scripts/world3d/avatar_outfit.gd")
 
 const HX := 0.108
 const HY := 0.128
@@ -13,6 +14,8 @@ var gender := "female"
 var body: Node3D
 var hips: Node3D
 var head_node: Node3D
+var cape_pivot: Node3D
+var tail_pivot: Node3D
 var hair_group: Node3D
 var eye_mats: Array = []
 var tri_count := 0
@@ -436,6 +439,7 @@ func _build_head() -> void:
 	head_node.add_child(hair_group)
 	_build_hair()
 	_build_accessories()
+	Outfit.build(self)
 
 func _build_face() -> void:
 	var esz: float = float(_p("eye_size", 0.082 if gender == "female" else 0.074))
@@ -909,3 +913,9 @@ func update_pose(vel: Vector3, grounded: bool, gliding: bool, dashing: bool, fac
 		_next_blink = 2.0 + _rng.randf() * 3.0
 	_blink = maxf(_blink - delta * 9.0, 0.0)
 	set_blink(_blink)
+	if cape_pivot != null:
+		var lift := 0.12 + 0.5 * minf(speed, 1.0) + (0.5 if gliding else 0.0) + (0.4 if dashing else 0.0) - (0.3 if not grounded and vel.y > 0.0 else 0.0)
+		cape_pivot.rotation.x = lerpf(cape_pivot.rotation.x, lift + sin(_time * 3.0) * 0.04, clampf(delta * 6.0, 0.0, 1.0))
+	if tail_pivot != null:
+		tail_pivot.rotation.y = sin(_time * 2.2) * 0.25 + _sway.z * 0.6
+		tail_pivot.rotation.x = -0.05 * minf(speed, 1.0)
