@@ -3,12 +3,14 @@ extends Control
 var move := Vector2.ZERO
 var jump_held := false
 var dash_held := false
+var _emote_flag := false
 var _cam_delta := Vector2.ZERO
 var _touches := {}
 var _stick_center := Vector2.ZERO
 var _stick_pos := Vector2.ZERO
 var _jump_c := Vector2.ZERO
 var _dash_c := Vector2.ZERO
+var _emote_c := Vector2.ZERO
 const BTN_R := 90.0
 const STICK_R := 120.0
 
@@ -22,9 +24,15 @@ func _layout() -> void:
 	var s := get_viewport_rect().size
 	_jump_c = Vector2(s.x - 150, s.y - 150)
 	_dash_c = Vector2(s.x - 330, s.y - 110)
+	_emote_c = Vector2(s.x - 70, s.y - 330)
 	_stick_center = Vector2(170, s.y - 170)
 	_stick_pos = _stick_center
 	queue_redraw()
+
+func consume_emote() -> bool:
+	var f := _emote_flag
+	_emote_flag = false
+	return f
 
 func consume_camera_delta() -> Vector2:
 	var d := _cam_delta
@@ -44,6 +52,9 @@ func _begin(i: int, p: Vector2) -> void:
 	if p.distance_to(_jump_c) < BTN_R * 1.3:
 		_touches[i] = "jump"
 		jump_held = true
+	elif p.distance_to(_emote_c) < 70.0:
+		_touches[i] = "emote"
+		_emote_flag = true
 	elif p.distance_to(_dash_c) < BTN_R * 1.2:
 		_touches[i] = "dash"
 		dash_held = true
@@ -88,5 +99,7 @@ func _draw() -> void:
 	draw_circle(_jump_c, BTN_R, Color(1, 0.6, 0.8, 0.55 if jump_held else 0.35))
 	draw_circle(_dash_c, BTN_R * 0.8, Color(0.4, 0.85, 1, 0.55 if dash_held else 0.35))
 	var f := ThemeDB.fallback_font
+	draw_circle(_emote_c, 52.0, Color(1, 0.85, 0.4, 0.35))
+	draw_string(f, _emote_c + Vector2(-30, 8), "HAPPY", HORIZONTAL_ALIGNMENT_LEFT, -1, 20)
 	draw_string(f, _jump_c + Vector2(-36, 10), "JUMP", HORIZONTAL_ALIGNMENT_LEFT, -1, 28)
 	draw_string(f, _dash_c + Vector2(-36, 10), "DASH", HORIZONTAL_ALIGNMENT_LEFT, -1, 26)

@@ -3,7 +3,7 @@ extends RefCounted
 static func all() -> Array:
 	return [
 		{
-			"name": "Rin", "seed": 11,
+			"name": "Rin", "age": 21, "gender": "female", "seed": 11, "curve": 0.5,
 			"skin": Color("ffe3d2"), "brow": Color("1f4f8f"),
 			"hair_style": "bob", "hair_color": Color("3fa0ff"), "hair_hl": Color("c4ecff"),
 			"eye_top": Color("6a1257"), "eye_bottom": Color("ff7cc0"),
@@ -11,7 +11,7 @@ static func all() -> Array:
 			"accessories": ["headphones"], "accent": Color("ff5d96"), "mouth": "smile",
 		},
 		{
-			"name": "Kaito", "seed": 23,
+			"name": "Kaito", "age": 27, "gender": "male", "seed": 23, "muscle": 0.55,
 			"skin": Color("f3d2bb"), "brow": Color("16102a"),
 			"hair_style": "spiky", "hair_color": Color("261c45"), "hair_hl": Color("8b74d9"),
 			"eye_top": Color("233a6b"), "eye_bottom": Color("86b6ff"),
@@ -19,7 +19,7 @@ static func all() -> Array:
 			"accessories": ["scarf", "coat"], "accent": Color("d64550"), "mouth": "flat",
 		},
 		{
-			"name": "Mira", "seed": 37,
+			"name": "Mira", "age": 24, "gender": "female", "seed": 37, "curve": 0.65,
 			"skin": Color("ffe6dc"), "brow": Color("7a68c4"),
 			"hair_style": "long", "hair_color": Color("b9a6ff"), "hair_hl": Color("ffffff"),
 			"eye_top": Color("0b5f6b"), "eye_bottom": Color("78f5dc"),
@@ -27,7 +27,7 @@ static func all() -> Array:
 			"accessories": ["glasses"], "accent": Color("8d7bd6"), "mouth": "smile",
 		},
 		{
-			"name": "Ren", "seed": 41,
+			"name": "Ren", "age": 23, "gender": "male", "seed": 41, "muscle": 0.95, "sleeves": "short",
 			"skin": Color("e9bf9c"), "brow": Color("7a2a10"),
 			"hair_style": "spiky", "hair_color": Color("ff5a2e"), "hair_hl": Color("ffd3a0"),
 			"eye_top": Color("7a3d00"), "eye_bottom": Color("ffd24d"),
@@ -35,7 +35,7 @@ static func all() -> Array:
 			"accessories": ["goggles"], "accent": Color("f2b441"), "mouth": "smirk",
 		},
 		{
-			"name": "Sora", "seed": 53,
+			"name": "Sora", "age": 20, "gender": "female", "seed": 53, "curve": 0.5, "legwear": "shorts",
 			"skin": Color("fbd9c8"), "brow": Color("0f7a5c"),
 			"hair_style": "ponytail", "hair_color": Color("2fd8a0"), "hair_hl": Color("dcfff2"),
 			"eye_top": Color("42207a"), "eye_bottom": Color("c08cff"),

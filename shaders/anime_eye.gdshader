@@ -7,6 +7,7 @@ uniform vec3 lash_color : source_color = vec3(0.07, 0.04, 0.1);
 uniform float open = 1.0;
 uniform float flip = 1.0;
 uniform vec2 look = vec2(0.0, 0.0);
+uniform float happy = 0.0;
 
 float circle(vec2 p, vec2 c, float r, float soft) {
 	return 1.0 - smoothstep(r - soft, r + soft, length(p - c));
@@ -39,6 +40,13 @@ void fragment() {
 	col = mix(col, lash_color, lash);
 	float low = 1.0 - smoothstep(bot + 0.03, bot + 0.09, p.y);
 	col = mix(col, lash_color, low * 0.55);
-	ALBEDO = col;
-	ALPHA = inside;
+	if (happy > 0.5) {
+		float arc_y = 0.32 - 0.75 * p.x * p.x;
+		float arc = (1.0 - smoothstep(0.07, 0.12, abs(p.y - arc_y))) * (1.0 - smoothstep(0.8, 0.92, abs(p.x)));
+		ALBEDO = lash_color;
+		ALPHA = arc;
+	} else {
+		ALBEDO = col;
+		ALPHA = inside;
+	}
 }

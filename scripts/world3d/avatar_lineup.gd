@@ -7,6 +7,7 @@ var avatars: Array = []
 var cam: Camera3D
 var orbit := 0.0
 var time := 0.0
+var _g_down := false
 
 func _ready() -> void:
 	var psm := ProceduralSkyMaterial.new()
@@ -40,6 +41,7 @@ func _ready() -> void:
 	for i in presets.size():
 		var a := AnimeAvatar.new()
 		a.build(presets[i])
+		a.auto_emotes = false
 		var x := (i - (presets.size() - 1) / 2.0) * 1.05
 		a.position = Vector3(x, 0, 0)
 		add_child(a)
@@ -58,6 +60,10 @@ func _process(delta: float) -> void:
 	time += delta
 	for a in avatars:
 		a.update_pose(Vector3.ZERO, true, false, false, Vector2.ZERO, delta)
+	if Input.is_physical_key_pressed(KEY_G) and not _g_down:
+		for a in avatars:
+			a.happy()
+	_g_down = Input.is_physical_key_pressed(KEY_G)
 	if Input.is_physical_key_pressed(KEY_LEFT):
 		orbit -= delta
 	if Input.is_physical_key_pressed(KEY_RIGHT):
