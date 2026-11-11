@@ -1,9 +1,9 @@
-# Quantum World: Decisions and Self-Sustaining Design (Draft v0.3)
+# Quantum World: Decisions and Self-Sustaining Design (Draft v0.4)
 
 ## 1. Decisions
 
 1. **Quanta is a closed-loop, earn-only currency.** It is earned by playing and spent in the game. It is never sold for money, cannot be cashed out and has no exchange integration.
-2. **Servers are optional and never required.** The game plays offline and the chain stays verifiable without any server. Rust servers provide fast bootstrap, the shop, an admin UI and support (`SERVER.md`). They hold no power over balances or rules.
+2. **Servers are optional and never required, but at least one is expected.** The game plays offline (`OFFLINE.md`) and the chain stays verifiable without any server. Rust servers provide fast bootstrap, the shop, an admin UI and support (`SERVER.md`), reachable over clearnet, Tor and I2P. They hold no power over balances or rules.
 3. **Revenue model: free to play, cosmetic monetization.** The developer earns through Crystals (premium shop credit), a seasonal pass, limited cosmetic drops and convenience slots. See section 5.
 4. **Never:** advertising, paid random loot boxes, pay-to-win items, selling Quanta.
 5. **Self-sustaining where possible:** low operating cost, self-balancing in-game economy.
@@ -16,18 +16,18 @@ The two-currency model and the Shop Authority role are specified in `IDENTITY-SH
 |---|---|---|
 | Anonymous transport | Tor and I2P networks | Existing public networks, no cost to us |
 | Peer discovery | DHT, signed peer lists, invite links and QR codes | |
-| Chain bootstrap | Redundant bootstrap endpoints and mirrors, later also peers | Untrusted: all data is verified against checkpoints (`SERVER.md` section 3) |
+| Chain bootstrap | Redundant bootstrap endpoints (clearnet, Tor, I2P) and mirrors, later also peers | Untrusted: all data is verified against checkpoints (`SERVER.md` section 3) |
 | Ledger validation | Keepers (volunteer and seed nodes) | See section 3 |
 | State snapshots | Mirrors and any peer holding a verified snapshot | Verified against the attested hash |
 | Universe data, avatars | Owner's device plus peers that cache it | Only hashes live on chain |
 | Shop catalogue | Signed list spread P2P and served by the server | |
-| Purchase confirmation, admin UI, recovery vault | Optional Rust server layer | `SERVER.md` |
+| Purchase confirmation, admin UI (onion only), recovery vault | Optional Rust server layer | `SERVER.md` |
 | App distribution | F-Droid, signed APK, optionally Google Play | Each release embeds a recent trust checkpoint |
 | Telemetry | None | |
 
 **Cold start, stated honestly.** On day one there are no community Keepers. The developer runs a few seed Keepers and bootstrap endpoints. They hold no special rights in the protocol and are meant to be diluted as community operators join.
 
-**Graceful degradation.** If the servers, the player base or the Keeper set shrink, solo play continues in offline mode behind `ChainBackend`; the shared layer gets quieter.
+**Graceful degradation.** If the servers, the player base or the Keeper set shrink, solo play continues in offline mode behind `ChainBackend` (`OFFLINE.md`); the shared layer gets quieter.
 
 ## 3. The Keeper Incentive Problem (closed-loop consequence)
 
@@ -64,7 +64,7 @@ Operating cost target: low (a few small servers, see `SERVER.md`). What remains 
 Rules: cosmetics and convenience only, fixed visible prices, no paid randomized rewards, no gameplay advantage. Quanta-priced shop items act as a sink and are earnable by playing.
 
 ### 5.2 Shop service
-The optional Rust Shop service confirms purchases and signs Crystal issues with a multisig key (`SERVER.md` section 6). If it is offline, only purchases and pass activation pause.
+The optional Rust Shop service confirms purchases and signs Crystal issues with a multisig key (`SERVER.md` section 6). Players can reach it over clearnet, Tor or I2P; the admin UI is onion only (`SERVER.md` section 8a). If the service is offline, only purchases and pass activation pause.
 
 ### 5.3 Distribution and payments
 - Google Play generally requires its own billing for digital goods and charges a fee. In many countries Google acts as merchant of record and handles sales tax. Verify the current policy before building.
@@ -80,7 +80,7 @@ The phase 1 vertical slice should be soft-launched to measure retention and paye
 ## 6. Impact on Other Documents
 
 - `CHAIN-DESIGN.md` is updated for Crystals, shop items and the Shop Authority; bootstrap per `SERVER.md`.
-- `PLAN.md` section 5.7 is replaced by section 5 above.
+- `PLAN.md` section 5.7 is replaced by section 5 above; sections 4.2 and 4.3 follow `SERVER.md`.
 
 ## 7. Open Questions
 
@@ -90,4 +90,4 @@ The phase 1 vertical slice should be soft-launched to measure retention and paye
 4. Unique paid nicknames, tagged free nicknames, or both?
 5. Retire developer seed Keepers after a fixed date or a Keeper-count threshold?
 6. Open governance for protocol upgrades, or developer-signed releases only?
-7. Further questions on servers: `SERVER.md` section 11.
+7. Further questions on servers: `SERVER.md` section 11; on offline play: `OFFLINE.md` section 7.

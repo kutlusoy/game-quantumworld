@@ -1,10 +1,10 @@
-# Quantum World: Optional Server Layer (Draft v0.2)
+# Quantum World: Optional Server Layer (Draft v0.3)
 
 This document refines `SUSTAINABILITY.md` (decision 2), `CHAIN-DESIGN.md` section 5.4 (bootstrap) and `PLAN.md` section 4.2 (transport). Servers are written in Rust.
 
 ## 1. Principle
 
-Servers are **not mandatory, but at least one will probably exist** (run by the developer). They are **replaceable and untrusted for integrity**. The game must stay playable offline, and the chain must stay verifiable, even if every server disappears. Servers add convenience (fast bootstrap), business functions (shop) and support (admin UI, recovery). They never hold power over balances or game rules; the consensus rules in `CHAIN-DESIGN.md` do.
+Servers are **not mandatory, but at least one will probably exist** (run by the developer). They are **replaceable and untrusted for integrity**. The game must stay playable offline (`OFFLINE.md`), and the chain must stay verifiable, even if every server disappears. Servers add convenience (fast bootstrap), business functions (shop) and support (admin UI, recovery). They never hold power over balances or game rules; the consensus rules in `CHAIN-DESIGN.md` do.
 
 ## 2. Roles
 
@@ -23,7 +23,7 @@ A new install gets to a verified, current chain state in seconds to minutes, thr
 
 ### 3.2 Endpoints and transports
 - The app ships with a hard-coded **bootstrap list** of at least 5 endpoints, run by different operators, hosts and countries. The developer runs 2 to 3; community operators can be added.
-- Endpoints are reachable over **clearnet (HTTPS), Tor onion and I2P**. An endpoint may offer one or several of them.
+- Endpoints are reachable over **clearnet (HTTPS), Tor onion and I2P**. An endpoint may offer one or several of them (hosting details in section 8a).
 - **Clearnet is allowed and is the fast path.** Tor and I2P can need 10 to 60 seconds to start, so a first-time user would otherwise wait. Clearnet endpoints use TLS with pinned public keys.
 - Clearnet weaknesses, accepted knowingly: the server and its host see the client's IP address, and domains and IPs can be blocked or seized. Mitigations: several independent domains plus IP fallbacks in the hard-coded list, mirrors on other hosts, and onion/I2P endpoints as the censorship-resistant path.
 - A **signed bootstrap list update** (version number, signed by a Bootstrap Authority key, multisig) can be gossiped and served. The app accepts only newer valid lists. The hard-coded list remains the root.
@@ -34,7 +34,8 @@ A new install gets to a verified, current chain state in seconds to minutes, thr
 |---|---|---|
 | Public static bootstrap data (checkpoints, snapshots, peer lists, catalogue) | Clearnet, Tor, I2P, in parallel | Public data, verified by the client, so the path does not matter for integrity |
 | Shop purchases and receipts | Clearnet or Tor/I2P | The payment provider already knows the buyer, so clearnet adds little exposure |
-| Recovery account, admin UI | Clearnet or Tor/I2P | Server-side services, HTTPS |
+| Recovery account | Clearnet or Tor/I2P | Server-side service, HTTPS or onion |
+| Admin UI | Onion only (see 8a) | Keep the management surface off the open internet |
 | Lobby, peer-to-peer gossip, address records, claims, chat | **Tor/I2P only** | Direct connections would expose a player's IP to other players |
 
 This refines the statement in `PLAN.md` section 4.2 that direct connections are never used: the exception is public bootstrap data and server services, never peer-to-peer traffic between players.
@@ -73,7 +74,7 @@ One Cargo workspace shared by all components:
 - `qw-server`: bootstrap, shop, admin API
 - `qw-client-ffi`: bindings into the Godot client (godot-rust)
 
-Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite for small setups), `rustls`, `webauthn-rs` for admin passkeys, `askama` or `maud` plus `htmx` for the admin UI, `arti` or a Tor daemon in front for onion service reachability. Evaluate Arti's onion service maturity before relying on it. No telemetry or third-party trackers.
+Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite for small setups), `rustls`, `webauthn-rs` for admin passkeys, `askama` or `maud` plus `htmx` for the admin UI, `arti` or a Tor daemon in front for onion service reachability, `i2pd` for I2P. Evaluate Arti's onion service maturity before relying on it. No telemetry or third-party trackers.
 
 ## 5. Admin UI
 
@@ -83,6 +84,7 @@ Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite f
 - **Approvals:** price changes and refunds above a threshold need two admins.
 - **Audit log:** append-only, hash-chained, every admin action recorded.
 - **No access to player keys.** The UI cannot read or reset player secrets.
+- **Reachable only as an onion service** (section 8a).
 
 ## 6. Shop Service and Keys
 
@@ -105,18 +107,33 @@ Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite f
 - Minors: no storage of personal data without a legal basis; check consent age rules (13 to 16 depending on country) before enabling email features.
 - Rough cost: 2 to 3 small VPS plus static hosting or CDN, in the order of 10 to 40 EUR per month, to be confirmed.
 
+## 8a. Hosting the Servers on Tor and I2P
+
+Every public server service can be reachable over clearnet, Tor and I2P at the same time.
+
+- **Layout:** the Rust server listens only on localhost. A reverse proxy handles clearnet HTTPS. A Tor daemon (or Arti) publishes a v3 onion service and `i2pd` publishes an I2P destination; both forward to the same local port. One application, three front doors.
+- **Persistent addresses:** onion and I2P keys are long-term, stored encrypted and backed up, so the addresses survive a host migration. The addresses are listed in the signed bootstrap list and match the persistent-address approach in `IDENTITY-SHOP.md` section 2.
+- **Separate onions by purpose:** one onion for public player services, a different one for the admin UI. The admin onion should additionally use Tor v3 client authorization so only authorized admin devices can even connect, on top of passkeys.
+- **Admin UI never on clearnet.** Optionally restrict further with an allowlist or VPN.
+- **Purchase verification without an open port:** the server calls the Google Play Developer API outbound over clearnet (unavoidable; this reveals the server's own IP only). For purchase notifications prefer a pull subscription instead of a public push endpoint, so no clearnet inbound endpoint is needed for the shop.
+- **Redundancy:** run several instances behind OnionBalance-style load sharing so one onion address survives the loss of a host. Use more than one provider.
+- **DoS resistance:** enable Tor's proof-of-work defense for onion services where available, rate limits, and keep heavy data (snapshots) on static mirrors and CDNs rather than the origin.
+- **Performance:** Tor and I2P are slower and can flap. That is why clients query several endpoints in parallel and clearnet and mirrors remain part of the redundancy.
+- **Privacy gain:** players who connect over Tor or I2P are not visible to the server by IP; the server host cannot be tied to the player's network location.
+
 ## 9. Roadmap Placement
 
-- Phase 3: bootstrap server and mirrors with peer lists (also useful before the chain exists).
+- Phase 3: bootstrap server and mirrors with peer lists, reachable over clearnet, Tor and I2P (also useful before the chain exists).
 - Phase 3b: checkpoint and snapshot serving.
-- Phase 3c: shop service, admin UI, recovery account.
+- Phase 3c: shop service, admin UI (onion), recovery account.
 
 ## 10. Impact on Other Documents
 
-- `SUSTAINABILITY.md`: decision 2 is "servers optional, never required"; add that at least one server is expected.
-- `PLAN.md` 4.2: clearnet exception for public bootstrap data and server services as in 3.2a.
-- `CHAIN-DESIGN.md` 5.4: servers are an untrusted bootstrap source; trust anchor per 3.5. 6.6: `RevokeIssue` if agreed.
-- `IDENTITY-SHOP.md`: recovery levels and optional account.
+- `SUSTAINABILITY.md`: decision 2 is "servers optional, never required", with at least one server expected and reachable over clearnet, Tor and I2P (done).
+- `PLAN.md` 4.2, 4.3: clearnet exception and bootstrap list (done).
+- `CHAIN-DESIGN.md` 5.4: servers are an untrusted bootstrap source with the trust anchor from 3.5, unchanged text remains valid. 6.6: `RevokeIssue` if agreed.
+- `IDENTITY-SHOP.md`: recovery levels and optional account (done).
+- `OFFLINE.md`: offline behavior when no server is reachable.
 
 ## 11. Open Questions
 
@@ -125,5 +142,6 @@ Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite f
 3. Accounts optional (recommended) or mandatory?
 4. Checkpoint embedding cadence: every app release only, or also signed checkpoints delivered by servers with quorum?
 5. Which clearnet domains and hosts, and how do you want to handle domain blocking or seizure?
+6. Arti or the classic Tor daemon for onion hosting, after a maturity check?
 
-Answered: clearnet is allowed, servers are optional but expected.
+Answered: clearnet is allowed, servers are optional but expected, servers may also run on Tor and I2P.
