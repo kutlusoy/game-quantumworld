@@ -39,10 +39,48 @@ func ellipsoid(center: Vector3, radii: Vector3, color: Color, rings: int = 14, s
 		return center + Vector3(u.x * radii.x, u.y * radii.y, u.z * radii.z)
 	_add_grid(rings + 1, segs, true, color, fn, keep)
 
-func tube(points: Array, radii: Array, color: Color, segs: int = 12, cap_start: bool = true, cap_end: bool = true, ring_colors: Array = []) -> void:
+func tube(points: Array, radii: Array, color: Color, segs: int = 12, cap_start: bool = true, cap_end: bool = true, ring_colors: Array = [], round_caps: int = 0) -> void:
 	var pts := points.duplicate()
 	var rad := radii.duplicate()
 	var rcol := ring_colors.duplicate()
+	if round_caps != 0 and pts.size() > 1:
+		var steps := [1.5, 1.15, 0.8, 0.4]
+		var head_p := []
+		var head_r := []
+		var head_c := []
+		var tail_p := []
+		var tail_r := []
+		var tail_c := []
+		var n0 := pts.size()
+		var l0 := ((rad[0] as Vector2).x + (rad[0] as Vector2).y) * 0.5
+		var l1 := ((rad[n0 - 1] as Vector2).x + (rad[n0 - 1] as Vector2).y) * 0.5
+		var t0: Vector3 = (pts[0] - pts[1]).normalized()
+		var t1: Vector3 = (pts[n0 - 1] - pts[n0 - 2]).normalized()
+		if (round_caps & 1) != 0:
+			for a in steps:
+				head_p.append(pts[0] + t0 * l0 * sin(a))
+				head_r.append((rad[0] as Vector2) * cos(a))
+				if not rcol.is_empty():
+					head_c.append(rcol[0])
+		else:
+			cap_start = true
+		steps.reverse()
+		if (round_caps & 2) != 0:
+			for a in steps:
+				tail_p.append(pts[n0 - 1] + t1 * l1 * sin(a))
+				tail_r.append((rad[n0 - 1] as Vector2) * cos(a))
+				if not rcol.is_empty():
+					tail_c.append(rcol[n0 - 1])
+		else:
+			cap_end = true
+		pts = head_p + pts + tail_p
+		rad = head_r + rad + tail_r
+		if not rcol.is_empty():
+			rcol = head_c + rcol + tail_c
+		if (round_caps & 1) != 0:
+			cap_start = false
+		if (round_caps & 2) != 0:
+			cap_end = false
 	if cap_start:
 		pts.push_front(pts[0])
 		rad.push_front(Vector2.ZERO)
