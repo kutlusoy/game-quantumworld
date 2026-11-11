@@ -1,7 +1,9 @@
 .godot/
 *.translation
-export_presets.cfg
+*.apk
+*.aab
 *.keystore
 *.jks
 android/
 builds/
+build/
