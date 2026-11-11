@@ -19,13 +19,13 @@ func _init() -> void:
 	game.touch.move = Vector2(0, -1)
 	for i in 60:
 		await physics_frame
-	check(game.sim.pz != z0 or game.sim.px != game.world.spawn.x * 1024 + 512, "stick input moves the player")
+	check(game.sim.pz != z0 or game.sim.px != game.world.spawn.x, "stick input moves the player")
 	check(game.input_log.size() >= 60, "inputs are recorded")
 	game.touch.move = Vector2.ZERO
 	game.touch.jump_held = true
 	for i in 3:
 		await physics_frame
-	check(game.sim.py > game.world.spawn.y * 1024 or not game.sim.grounded, "jump input leaves the ground")
+	check(game.sim.py > game.world.spawn.y or not game.sim.grounded, "jump input leaves the ground")
 	game.touch.jump_held = false
 	if failures == 0:
 		print("WORLD3D SMOKE PASSED")
