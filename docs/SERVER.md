@@ -113,7 +113,7 @@ Suggested stack: `tokio`, `axum`, `tower-http`, `sqlx` with PostgreSQL (SQLite f
 
 ## 10. Impact on Other Documents
 
-- `SUSTAINABILITY.md`: decision 2 is \"servers optional, never required\"; add that at least one server is expected.
+- `SUSTAINABILITY.md`: decision 2 is "servers optional, never required"; add that at least one server is expected.
 - `PLAN.md` 4.2: clearnet exception for public bootstrap data and server services as in 3.2a.
 - `CHAIN-DESIGN.md` 5.4: servers are an untrusted bootstrap source; trust anchor per 3.5. 6.6: `RevokeIssue` if agreed.
 - `IDENTITY-SHOP.md`: recovery levels and optional account.
