@@ -1,161 +1,187 @@
-# Quantum World – Projektplan & Gameplay-Skizze
+# Quantum World: Project Plan and Gameplay Sketch
 
-Status: Entwurf v0.1
+Status: Draft v0.3
+
+Related documents: `CHAIN-DESIGN.md` (ledger), `SUSTAINABILITY.md` (decisions and revenue model), `IDENTITY-SHOP.md` (shop, accounts, addresses), `SERVER.md` (optional server layer and bootstrap), `OFFLINE.md` (offline play).
 
 ## 1. Vision
 
-Ein buntes, fröhliches Android-Spiel mit Suchtfaktor: sehr leicht zu lernen, Anime-Optik und Anime-Musik, hunderte verbundene Level, eine anonyme dezentrale Lobby mit 3D-Avataren und ein persönliches „Quanten-Universum" pro Spieler (Welten, Länder, Städte, Dörfer, Teleportation).
+A colorful, cheerful Android game with real addiction potential: very easy to learn, anime visuals and anime-style music, hundreds of interconnected levels, an anonymous decentralized lobby with 3D avatars, and a personal "Quantum Universe" for every player (worlds, countries, cities, villages, teleportation).
 
-**Designsäulen**
-1. **Ein-Daumen-Spiel**: jede Aktion in 1–2 Taps, Session 2–5 Minuten.
-2. **Belohnung in jeder Sekunde**: Farben, Sound, Partikel bei jedem Zug.
-3. **Anonym by default**: kein Login, keine E-Mail, keine Telefonnummer.
-4. **Dezentral**: das Spiel läuft auch, wenn kein Server existiert.
-5. **Mein Universum**: der Fortschritt wird sichtbar als eigene, wachsende Welt.
+**Design pillars**
+1. **One-thumb play**: every action takes 1 to 2 taps, sessions last 2 to 5 minutes.
+2. **Reward every second**: colors, sound and particles on every move.
+3. **Anonymous by default**: no login, no email, no phone number. Tor and I2P run invisibly in the background; players never see or configure anything technical.
+4. **Decentralized and offline-capable**: the game keeps working even if no server or network exists.
+5. **My universe**: progress becomes visible as a growing world of your own.
 
-## 2. Zentrale Entscheidungen (ehrlich bewertet)
+## 2. Key Decisions (honestly assessed)
 
-| Thema | Empfehlung | Begründung |
+| Topic | Recommendation | Reasoning |
 |---|---|---|
-| Engine | **Godot 4** (oder Unity) | Godot: Open Source, kleine APK, gute 2D/3D-Mischung, passt zur Dezentral-Philosophie. Unity hat mehr Android-Tooling, aber Lizenz-/Datenschutz-Ballast. |
-| Spielkern | **Match-3 / Puzzle-Hybrid auf einer Weltkarte** | Bewiesen süchtig machend, sehr leicht, 1-Daumen, Level lassen sich leicht verknüpfen. |
-| Identität | **Kryptografisches Schlüsselpaar (Ed25519) auf dem Gerät** | Kein Account-Server. Die Identität ist der Schlüssel. Backup per Seed-Phrase (12 Wörter). |
-| Netzwerk | **libp2p-artig P2P über Tor/I2P-Transport** | siehe 4. |
-| Daten | **Lokal zuerst + CRDTs** | Spielstand liegt auf dem Gerät, Sync ohne zentrale Instanz. |
-| 3D-Avatare | **Baukasten (VRM/glTF-Teile)** | Kleine Dateien, schnell über P2P übertragbar (nur Parameter, kein Mesh-Upload). |
+| Engine | **Godot 4** (or Unity) | Godot is open source, has a small APK and handles mixed 2D/3D well, which fits the decentralized philosophy. Unity has more Android tooling but carries licensing and privacy baggage. |
+| Core gameplay | **Match-3 / puzzle hybrid on a world map** | Proven to be addictive, very easy, one-thumb friendly, and levels are easy to interconnect. |
+| Identity | **Cryptographic key pair (Ed25519) on the device** | No account server. The identity is the key. Layered recovery in `IDENTITY-SHOP.md`. |
+| Network | **libp2p-style P2P over Tor/I2P transports** | See section 4. |
+| Ledger | **Attested, pruned, non-PoW chain** | See `CHAIN-DESIGN.md`. |
+| Servers | **Optional Rust servers, expected but never required** | See `SERVER.md`. |
+| Data | **Local first + CRDTs** | Save data lives on the device, sync works without a central instance. |
+| 3D avatars | **Modular kit (VRM/glTF parts)** | Small files, cheap to transmit over P2P (parameters only, no mesh upload). |
+| Business model | **Free to play, cosmetic monetization** | See section 5.7 and `SUSTAINABILITY.md`. |
 
-**Wichtige Realitätschecks**
-- **Tor/I2P auf Android**: machbar (Tor via `tor-android`/Arti, I2P via `i2pd` oder I2P-Android-Library). Aber **Latenz 300 ms – 2 s**, daher **kein Echtzeit-Action-Multiplayer**. Das Spielkonzept (rundenbasiert/asynchron) passt deshalb ideal.
-- **Google Play** erlaubt Tor-Nutzung, aber Apps mit eingebettetem I2P/Tor brauchen saubere Datenschutz-Erklärung. Alternative Verteilung: F-Droid, direkte APK.
-- **Akku/Datenverbrauch**: Tor/I2P im Hintergrund ist teuer. Lösung: **nur in der Lobby/beim Sync aktiv**, Level selbst laufen offline.
-- **Komplett serverlos** ist schwer bei: Auffinden anderer Spieler (Discovery), Cheating-Schutz, Moderation. Lösung: **Hybrid** (siehe 4.3): optionale, austauschbare „Bootstrap-Knoten", aber keine zentrale Autorität.
-- **Anonym ≠ unmoderiert**: Kinder/Jugendliche, Chat-Missbrauch → Chat standardmäßig nur Emotes/Sticker, Freitext optional + lokale Blocklisten.
+**Reality checks**
+- **Tor/I2P on Android** is feasible (Tor via `tor-android`/Arti, I2P via `i2pd` or the I2P Android library). However, **latency is 300 ms to 2 s**, so **real-time action multiplayer is out**. The planned turn-based/asynchronous design fits this well.
+- **Google Play** allows Tor usage, but apps embedding Tor/I2P need a clean privacy statement. Alternative distribution: F-Droid, direct APK.
+- **Battery/data usage**: Tor/I2P in the background is expensive. Solution: the network layer starts and stops automatically, **active only in the lobby and during sync**, levels themselves run offline. Android background limits (Doze, app standby) require a short-lived foreground service for sync.
+- **Fully serverless** is hard for peer discovery, cheat protection and moderation. Solution: a **hybrid** (see 4.3) with replaceable bootstrap endpoints and optional servers but no central authority over game state.
+- **Anonymous does not mean unmoderated**: children/teenagers and chat abuse are real concerns. Chat is emotes/stickers only by default, free text optional plus local block lists.
 
-## 3. Architektur-Überblick
+## 3. Architecture Overview
 
 ```
-┌─────────────── Android App (Godot) ───────────────┐
-│ UI/Gameplay │ Avatar-Baukasten │ Audio-Engine     │
-├────────────────────────────────────────────────────┤
-│ Spielstand lokal (SQLite, verschlüsselt, CRDT)     │
-│ Identität: Ed25519-Key + Seed-Backup               │
-├────────────────────────────────────────────────────┤
-│ P2P-Schicht (libp2p/Gossip/DHT)                    │
-│   Transporte:  Tor (Onion Services) │ I2P │ direkt │
-├────────────────────────────────────────────────────┤
-│ Optional: Bootstrap-/Relay-Knoten (jeder kann       │
-│ einen betreiben, nicht vertrauenswürdig nötig)     │
-└────────────────────────────────────────────────────┘
++---------------- Android App (Godot) ----------------+
+| UI/Gameplay | Avatar kit | Audio engine | Shop         |
++------------------------------------------------------+
+| Local save data (SQLite, encrypted, CRDT)             |
+| Identity: Ed25519 key + layered recovery              |
++------------------------------------------------------+
+| Ledger client (light client, ChainBackend)            |
++------------------------------------------------------+
+| P2P layer (libp2p/gossip/DHT)                         |
+|   Transports: Tor (onion services) | I2P              |
++------------------------------------------------------+
+| Optional: bootstrap endpoints (clearnet, Tor, I2P),   |
+| Keepers, Shop service (anyone can run the first two,  |
+| no trust required)                                    |
++------------------------------------------------------+
 ```
 
-## 4. Dezentrales Netzwerk im Detail
+## 4. Decentralized Network in Detail
 
-### 4.1 Identität
-- Beim ersten Start: Schlüsselpaar erzeugen, Anzeigename + Avatar wählen. **Kein Register, kein Login.**
-- Public Key = Spieler-ID. Seed-Phrase zum Wiederherstellen auf neuem Gerät.
-- Optional: Gerät-zu-Gerät-Transfer per QR-Code.
+### 4.1 Identity
+- On first start: generate a key pair, pick a display name and avatar. **No registration, no login.** The first start works fully offline.
+- Public key = player ID. Recovery is layered (automatic OS backup, QR phone transfer, rescue card, trusted people, optional recovery account); see `IDENTITY-SHOP.md` section 3.
 
 ### 4.2 Transport
-- Jeder Client veröffentlicht sich als **Tor Onion Service v3** und/oder **I2P-Destination**.
-- Der Nutzer wählt in den Einstellungen: *Tor* / *I2P* / *Beides* / *Direkt (schnell)*.
-- Standard: Tor für Lobby, direkt für nichts Privates.
+- Every client publishes itself as a **Tor v3 onion service** and/or an **I2P destination**, with persistent keys and signed address records (see `IDENTITY-SHOP.md` section 2).
+- **No user-facing transport settings.** An internal transport manager chooses automatically: it starts Tor and I2P in parallel, uses whichever connects first and keeps the other as a fallback. If both fail, the game stays fully playable offline and retries silently.
+- **Peer-to-peer traffic between players never uses direct connections**, because that would expose IP addresses to other players. Exception: public bootstrap data and optional server services may use clearnet (HTTPS) as the fast path, as defined in `SERVER.md` section 3.2a.
+- An advanced/developer option may exist in a hidden menu (for example "Tor/I2P only"), but is not part of the normal UI.
 
-### 4.3 Discovery & Lobby ohne Zentralserver
-- **DHT (Kademlia)** für Auffinden von Lobbys („Räume") anhand eines Hashes (z. B. Raum „Sakura-Platz").
-- **Gossip-PubSub** pro Raum für Anwesenheit, Emotes, Chat.
-- **Bootstrap-Liste**: fest eincompilierte + von der Community pflegbare Knotenliste (Onion-Adressen). Fällt alles aus: Einladungs-Links/QR zwischen Freunden.
-- Lobby-Größe pro Instanz max. ~20–30 Avatare (sonst zu viel Traffic über Tor); automatisch mehrere Instanzen des gleichen Raums.
+### 4.3 Discovery and Lobby without a Central Server
+- **DHT (Kademlia)** to find lobbies ("rooms") by hash (e.g. room "Sakura Plaza").
+- **Gossip PubSub** per room for presence, emotes and chat.
+- **Bootstrap list**: a hard-coded list of at least 5 endpoints (clearnet, Tor, I2P) from different operators, plus signed list updates (`SERVER.md` section 3.2). It is a starting hint and never an authority. If everything fails: invite links/QR codes between friends.
+- Lobby size per instance max. ~20 to 30 avatars (more is too much traffic over Tor); multiple instances of the same room are created automatically.
 
-### 4.4 Spielstand & Anti-Cheat
-- Solo-Fortschritt: lokal, Cheating betrifft nur einen selbst.
-- Gemeinsame Dinge (Ranglisten, Handel, Events): **signierte Ergebnisse + Replay-Hash**; Gegenspieler/Zeugen verifizieren durch Nachspielen (Level sind deterministisch per Seed).
-- Ranglisten: lokal berechnete Top-Listen aus signierten Ergebnissen von Peers („gossip leaderboard"), nicht manipulationssicher, aber ausreichend für Spaß.
+### 4.4 Save Data and Anti-Cheat
+- Solo progress: local, cheating only affects the cheater.
+- Shared features (leaderboards, trading, events): **signed results plus replay hash**; opponents/witnesses verify by replaying (levels are deterministic via seed). The ledger for shared state is specified in `CHAIN-DESIGN.md`.
+- Leaderboards: top lists computed locally from signed results of peers ("gossip leaderboard"). Not tamper-proof, but sufficient for fun.
 
-### 4.5 Daten, die geteilt werden
-Nur: öffentlicher Schlüssel, Name, Avatar-Parameter (~200 Byte), Position in der Lobby, signierte Level-Ergebnisse, Emotes. **Keine** Geräte-IDs, keine IP (durch Tor/I2P), keine Analytics.
+### 4.5 Data That Is Shared
+Only: public key, name, avatar parameters (~200 bytes), lobby position, signed level results, emotes. **No** device IDs, no IP (thanks to Tor/I2P), no analytics.
 
-## 5. Gameplay-Skizze
+### 4.6 Invisible Networking (UX rules)
+- The words "Tor", "I2P", "onion", "DHT", "peer" and "node" never appear in the normal UI. Neutral wording is used instead, e.g. "Connecting to the Nexus".
+- Startup: the network layer boots in the background (first connection can take 10 to 60 seconds) while the player is already playing the tutorial and first levels. Nothing blocks on the network.
+- Connection state is shown as one small, friendly icon (e.g. a glowing portal: closed, opening, open). No error dialogs, no technical messages.
+- Network failures degrade gracefully: lobby shows "Nexus is far away, try again later" and offers NPC avatars; progress is never lost. Offline behavior is specified in `OFFLINE.md`.
+- Data usage and battery: sync only on Wi-Fi by default, a single toggle "Save data" in the settings.
+- Legal/store: the privacy policy and the store listing still describe the use of anonymizing networks in plain language, even though the in-game UI does not.
 
-### 5.1 Kernloop (2–5 Minuten)
-1. Spieler wählt einen **Knoten** auf der Weltkarte (Level).
-2. Löst ein farbenfrohes **Match-3-Puzzle** („Quanten-Teilchen" in 6 Farben verbinden, wischen/tippen).
-3. Spezialeffekte: **Superposition** (Teilchen ist 2 Farben gleichzeitig), **Verschränkung** (zwei Teilchen reagieren gemeinsam), **Tunneln** (Teilchen springt durch Hindernisse), **Kollaps** (Bombe).
-4. Ergebnis: 1–3 Sterne + **Quanten-Energie** + Zufallsbelohnung (Dopamin-Loop).
-5. Energie baut das eigene **Universum** aus (Meta-Spiel).
-6. Neues Gebiet freigeschaltet, nächster Knoten leuchtet → „nur noch ein Level".
+## 5. Gameplay Sketch
 
-### 5.2 Level-Struktur („verbundene Level")
-Keine lineare Liste, sondern ein **Graph**:
-- **Welt** (Planet) → **Land** → **Stadt/Dorf** → **Level-Knoten**.
-- Knoten sind durch Pfade verbunden; Sterne öffnen Tore, Teleporter verbinden entfernte Welten.
-- **Geheime Pfade**: Bestimmte Muster/Sternkombinationen enthüllen versteckte Level (Entdeckerlust).
-- Ziel: 5 Welten × 5 Länder × ~100 Level ≈ **2500 Level** langfristig. Start: **1 Welt, 150 Level**.
+### 5.1 Core Loop (2 to 5 minutes)
+1. The player picks a **node** on the world map (a level).
+2. Solves a colorful **match-3 puzzle** ("quantum particles" in 6 colors, swipe/tap).
+3. Special effects: **Superposition** (a particle is two colors at once), **Entanglement** (two particles react together), **Tunneling** (a particle jumps through obstacles), **Collapse** (bomb).
+4. Result: 1 to 3 stars plus **quantum energy** plus a random reward (dopamine loop).
+5. Energy expands the player's own **universe** (meta game).
+6. A new area unlocks, the next node lights up: "just one more level".
 
-### 5.3 Das persönliche Quanten-Universum
-- Jeder Spieler besitzt ein Universum aus **Welten**, die er mit Energie „kollabieren lässt" (= freischaltet/baut).
-- Welten haben Biome (Sakura-Wald, Kristallwüste, Wolkenstadt, Unterwasser-Neon, Retro-Arcade).
-- Auf Welten: **Länder → Städte → Dörfer**, die der Spieler gestaltet (Gebäude, Pflanzen, Deko, Musikstationen).
-- **Besuchen**: Andere Spieler können Universen per Link/Lobby-Portal besuchen (Daten werden P2P geladen, nur wenn Besitzer online/gecacht).
-- **Teleportation**: Portale zwischen eigenen Welten, zu Freunden und zur Lobby. Schnellreise-Animation = Belohnungsmoment.
-- **Quanten-Zufall**: Täglich wechselnde „Fluktuation" (zufälliges Ereignis, seltene Objekte).
+### 5.2 Level Structure ("interconnected levels")
+Not a linear list but a **graph**:
+- **World** (planet) -> **country** -> **city/village** -> **level node**.
+- Nodes are linked by paths; stars open gates, teleporters connect distant worlds.
+- **Secret paths**: certain patterns/star combinations reveal hidden levels (joy of discovery).
+- Long-term target: 5 worlds x 5 countries x ~100 levels = **~2500 levels**. Start: **1 world, 150 levels**.
 
-### 5.4 Lobby („Nexus")
-- Ein schwebender Anime-Platz im Weltall. Avatare laufen herum (Stick links, Emote-Rad rechts).
-- Aktivitäten: Mini-Duelle (asynchron-Puzzle mit gleichem Seed), Tauschbörse (Dekoration), gemeinsame **Raid-Level** (alle Spieler lösen gemeinsam einen Mega-Level über Tage), Fotospot, Musik-Jam.
-- Chat: Standard **Emotes/Sticker**, Freitext optional.
+### 5.3 The Personal Quantum Universe
+- Every player owns a universe made of **worlds** that they "collapse" with energy (= unlock/build).
+- Worlds have biomes (sakura forest, crystal desert, cloud city, underwater neon, retro arcade).
+- On worlds: **countries -> cities -> villages** that the player shapes (buildings, plants, decoration, music stations).
+- **Visiting**: other players can visit universes via link/lobby portal (data is loaded P2P, only if the owner is online or cached).
+- **Teleportation**: portals between own worlds, to friends and to the lobby. The fast-travel animation is a reward moment.
+- **Quantum randomness**: a daily "fluctuation" (random event, rare items).
 
-### 5.5 Avatare
-- 3D, Chibi-Anime-Stil (cel-shaded). Baukasten: Körperform, Haare (50+), Augen, Outfits, Flügel/Schwänze, Aura.
-- Freischaltbar durch Spielen (nie Pay-to-Win), Teilen = nur Parameter.
-- Avatar läuft in Lobby + Universum, im Level erscheint er als Maskottchen, das jubelt.
+### 5.4 Lobby ("Nexus")
+- A floating anime plaza in space. Avatars walk around (stick on the left, emote wheel on the right).
+- Activities: mini duels (asynchronous puzzle with the same seed), trading post (decoration), cooperative **raid levels** (all players solve one mega level over several days), photo spots, music jam, the **Shop**.
+- Chat: **emotes/stickers** by default, free text optional.
 
-### 5.6 Sucht-/Bindungsmechaniken (verantwortungsvoll)
-- Dichte Mikro-Belohnungen (Combo-Sound, Konfetti, Sterne).
-- Tägliche Login-Belohnung, tägliche Quests, wöchentliche Events.
-- **Fast-Gewinn-Momente** (Level knapp verpasst → „Noch ein Versuch").
-- Sichtbare Sammlungen (Avatar-Teile, Teilchen-Skins, Musik-Tracks).
-- Soziales: Lobby-Anwesenheit, gemeinsame Raids.
-- **Ethik**: keine Lootboxen mit Echtgeld, keine Dark Patterns, optionale Pausenhinweise. (Wichtig für Store-Richtlinien.)
+### 5.5 Avatars
+- 3D, chibi anime style (cel-shaded). Kit: body shape, hair (50+), eyes, outfits, wings/tails, aura.
+- Unlockable through play (never pay to win), cosmetic premium items in the Shop, sharing = parameters only.
+- The avatar walks in the lobby and the universe; in levels it appears as a mascot that cheers.
 
-### 5.7 Monetarisierung (anonym kompatibel)
-Kein Account → klassische Abos/Käufe schwierig. Optionen: einmaliger Premium-Kauf, kosmetische Käufe über Google Play, freiwillige Spenden (Monero/Lightning), optional werbefrei. Entscheidung später.
+### 5.6 Addiction/Retention Mechanics (responsible)
+- Dense micro rewards (combo sounds, confetti, stars).
+- Daily login reward, daily quests, weekly events, seasons with the Quantum Pass.
+- **Near-win moments** (level narrowly missed -> "one more try").
+- Visible collections (avatar parts, particle skins, music tracks).
+- Social: lobby presence, cooperative raids.
+- **Ethics**: no paid random loot boxes, no dark patterns, optional break reminders (also important for store policies).
 
-## 6. Kunst & Musik
+### 5.7 Monetization
+Free to play. Revenue through cosmetics and convenience only; details, rules and the Shop service are in `SUSTAINABILITY.md` section 5 and `SERVER.md`.
+- **Quanta** (earned by playing) is never sold.
+- **Crystals** (premium shop credit) are sold in packs, not transferable, not convertible to money.
+- **Quantum Pass**: seasonal free and premium reward track, cosmetics only.
+- **Limited drops, bundles, convenience slots**, optional supporter pack.
+- Never: ads, paid random boxes, pay-to-win.
 
-- **Optik**: bunt, Pastell + Neon, cel-shaded 3D, 2D-Puzzle mit großen, weichen Formen.
-- **Musik** (Anime-Stil): J-Pop/Future-Bass/Lo-Fi-Chill pro Welt, adaptive Musik (Layer werden bei Combos zugeschaltet).
-- Lizenzen: Eigenkompositionen oder CC0/auftragsbasiert beauftragen (**keine** urheberrechtlich geschützten Anime-Songs).
-- Sound-Design: jede Combo erzeugt eine Tonfolge zur Musik (Tonart-synchron).
+## 6. Art and Music
+
+- **Visuals**: colorful, pastel plus neon, cel-shaded 3D, 2D puzzle with large, soft shapes.
+- **Music** (anime style): J-pop/future bass/lo-fi chill per world, adaptive music (layers fade in on combos).
+- Licensing: original compositions or CC0/commissioned work (**no** copyrighted anime songs). Own art, music and brand stay proprietary to protect revenue.
+- Sound design: every combo produces a tone sequence in key with the music.
 
 ## 7. Roadmap
 
-| Phase | Inhalt | Ergebnis |
+| Phase | Content | Result |
 |---|---|---|
-| 0 – Konzept (2–3 Wochen) | Dieser Plan, Prototyp-Papier-Skizzen, Engine-Entscheidung | Go/No-Go |
-| 1 – Vertical Slice (2–3 Monate) | Match-3-Kern, 20 Level, Weltkarte, Placeholder-Musik, Avatar-Basis | Spielbarer APK-Prototyp, Fun-Test |
-| 2 – Meta (2–3 Monate) | Universum-Baumodus, Fortschritt, Teleportation, 100+ Level, Musik | Single-Player-Beta |
-| 3 – Identität & P2P (3 Monate) | Schlüssel-Identität, Tor-Transport, DHT, Lobby mit 2–10 Spielern | Test-Lobby |
-| 4 – I2P, Duelle, Raids (2–3 Monate) | I2P, asynchrone Duelle, Tausch, Events | Offene Beta |
-| 5 – Launch & Live-Betrieb | F-Droid/Play, Community-Knoten, Content-Updates | 1.0 |
+| 0: Concept (2 to 3 weeks) | This plan, paper prototype sketches, engine decision | Go/No-Go |
+| 1: Vertical slice (2 to 3 months) | Match-3 core, 20 levels, world map, placeholder music, basic avatar, offline-first save data. Soft launch to measure retention and payer conversion | Playable APK prototype, fun test |
+| 2: Meta (2 to 3 months) | Universe building mode, progression, teleportation, 100+ levels, music | Single-player beta |
+| 2.5: Ledger spec (1 to 2 months) | Leaf and claim formats, emission model, economy simulator, local `ChainBackend` | Spec v1 |
+| 3: Identity and P2P (3 months) | Key-based identity, automatic transport manager (Tor first), DHT, bootstrap endpoints (clearnet, Tor, I2P), lobby with 2 to 10 players, invisible-networking UX | Test lobby |
+| 3a to 3c: Chain and Shop | Private testnet, pruning and bootstrap, Shop Authority and Crystals, shop service, admin UI (see `CHAIN-DESIGN.md` section 10 and `SERVER.md` section 9) | Closed beta with first purchases |
+| 4: I2P, duels, raids (2 to 3 months) | I2P added to the transport manager, asynchronous duels, trading, events | Open beta |
+| 5: Launch and live operation | F-Droid/Play, community nodes, content updates | 1.0 |
 
-**Empfehlung:** Zuerst **Fun beweisen (Phase 1)**, erst danach das aufwendige Netzwerk bauen. Das Netzwerk darf Spaß nie blockieren: Das Spiel muss **offline voll spielbar** sein.
+**Recommendation:** prove the fun first (phase 1), only then build the expensive networking and chain. The network must never block fun: the game must be **fully playable offline**.
 
-## 8. Risiken
+## 8. Risks
 
-| Risiko | Gegenmaßnahme |
+| Risk | Mitigation |
 |---|---|
-| Tor/I2P zu langsam | Nur asynchrone Mechaniken; Cache; Direktmodus wählbar |
-| Wenige Spieler → leere Lobby | Bots/NPC-Avatare, Offline-Lobby-Simulation, Events zur Bündelung |
-| Missbrauch/Chat | Emotes first, lokale Blocklisten, Report-Signale in Gossip |
-| Store-Ablehnung | Datenschutz-Doku, F-Droid-Alternative |
-| Scope zu groß | Strikte Phasen, Single-Player zuerst |
-| Cheating | Deterministische Level + Replay-Verifikation |
+| Tor/I2P too slow | Asynchronous mechanics only; caching; automatic fallback between transports; clearnet bootstrap for public data |
+| Few players -> empty lobby | Bots/NPC avatars, offline lobby simulation, events to concentrate players |
+| Abuse/chat | Emotes first, local block lists, report signals in gossip |
+| Store rejection | Privacy documentation, F-Droid alternative |
+| Scope too large | Strict phases, single-player first |
+| Cheating | Deterministic levels plus replay verification |
+| Weak retention or conversion | Soft launch in phase 1 before building network and chain |
+| Regulation of virtual currency | Closed-loop currencies, legal review, see `CHAIN-DESIGN.md` section 9 |
+| Server seizure, blocking or compromise | Multiple endpoints and mirrors, onion/I2P access, multisig shop key, servers untrusted for integrity |
 
-## 9. Offene Fragen an dich
+## 9. Open Questions
 
-1. Spielkern: Match-3 ok oder eher Runner/Idle/Aufbau?
-2. Engine: Godot (Open Source) oder Unity?
-3. Zielgruppe/Alter (beeinflusst Chat & Store-Einstufung)?
-4. Monetarisierung: kostenlos, einmaliger Kauf, Spenden?
-5. Team: allein oder mit Grafiker/Komponist?
-6. Verteilung: Google Play, F-Droid oder beides?
+1. Core gameplay: is match-3 fine, or rather runner/idle/builder?
+2. Engine: Godot (open source) or Unity?
+3. Target audience/age (affects chat, shop and store rating)?
+4. Team: solo or with an artist/composer?
+5. Distribution: Google Play, F-Droid or both?
+6. Open questions on shop, accounts, servers, offline and governance: see `SUSTAINABILITY.md` section 7, `IDENTITY-SHOP.md` section 5, `SERVER.md` section 11 and `OFFLINE.md` section 7.
