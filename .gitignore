@@ -1,0 +1,7 @@
+.godot/
+*.translation
+export_presets.cfg
+*.keystore
+*.jks
+android/
+builds/
