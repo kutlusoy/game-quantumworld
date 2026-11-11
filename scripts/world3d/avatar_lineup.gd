@@ -41,7 +41,6 @@ func _ready() -> void:
 	for i in presets.size():
 		var a := AnimeAvatar.new()
 		a.build(presets[i])
-		a.auto_emotes = false
 		var x := (i - (presets.size() - 1) / 2.0) * 1.05
 		a.position = Vector3(x, 0, 0)
 		add_child(a)

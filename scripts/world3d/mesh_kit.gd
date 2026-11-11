@@ -5,7 +5,7 @@ var cols := PackedColorArray()
 var uvs := PackedVector2Array()
 var idx := PackedInt32Array()
 
-func _add_grid(rows: int, per_row: int, wrap: bool, color: Color, fn: Callable, keep: Callable = Callable()) -> void:
+func _add_grid(rows: int, per_row: int, wrap: bool, color: Color, fn: Callable, keep: Callable = Callable(), color_fn: Callable = Callable()) -> void:
 	var base := verts.size()
 	var pos := []
 	for r in rows:
@@ -13,7 +13,7 @@ func _add_grid(rows: int, per_row: int, wrap: bool, color: Color, fn: Callable, 
 			var p: Vector3 = fn.call(r, c)
 			pos.append(p)
 			verts.append(p)
-			cols.append(color)
+			cols.append(color_fn.call(r, c) if color_fn.is_valid() else color)
 			var u := float(c) / float(per_row if wrap else maxi(per_row - 1, 1))
 			uvs.append(Vector2(u, float(r) / float(maxi(rows - 1, 1))))
 	var cmax := per_row if wrap else per_row - 1
@@ -39,15 +39,20 @@ func ellipsoid(center: Vector3, radii: Vector3, color: Color, rings: int = 14, s
 		return center + Vector3(u.x * radii.x, u.y * radii.y, u.z * radii.z)
 	_add_grid(rings + 1, segs, true, color, fn, keep)
 
-func tube(points: Array, radii: Array, color: Color, segs: int = 12, cap_start: bool = true, cap_end: bool = true) -> void:
+func tube(points: Array, radii: Array, color: Color, segs: int = 12, cap_start: bool = true, cap_end: bool = true, ring_colors: Array = []) -> void:
 	var pts := points.duplicate()
 	var rad := radii.duplicate()
+	var rcol := ring_colors.duplicate()
 	if cap_start:
 		pts.push_front(pts[0])
 		rad.push_front(Vector2.ZERO)
+		if not rcol.is_empty():
+			rcol.push_front(rcol[0])
 	if cap_end:
 		pts.push_back(pts[pts.size() - 1])
 		rad.push_back(Vector2.ZERO)
+		if not rcol.is_empty():
+			rcol.push_back(rcol[rcol.size() - 1])
 	var n := pts.size()
 	var frames := []
 	for i in n:
@@ -68,7 +73,11 @@ func tube(points: Array, radii: Array, color: Color, segs: int = 12, cap_start: 
 		var f: Array = frames[r]
 		var rr: Vector2 = rad[r]
 		return pts[r] + f[0] * cos(th) * rr.x + f[1] * sin(th) * rr.y
-	_add_grid(n, segs, true, color, fn)
+	var cfn := Callable()
+	if not rcol.is_empty():
+		cfn = func(r: int, _c: int) -> Color:
+			return rcol[r]
+	_add_grid(n, segs, true, color, fn, Callable(), cfn)
 
 func ribbon(points: Array, widths: Array, hint: Vector3, color: Color) -> void:
 	var n := points.size()
