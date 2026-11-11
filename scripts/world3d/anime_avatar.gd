@@ -38,9 +38,8 @@ var _emote_dur := 0.0
 var _body_y := 0.0
 var _spin := 0.0
 var _happy := 0.0
-var _idle_t := 0.0
-var _next_fidget := 8.0
-var auto_emotes := true
+var _mouths := {}
+var _base_expression := "friendly"
 
 func _p(key: String, default: Variant) -> Variant:
 	return params.get(key, default)
@@ -62,6 +61,7 @@ func build(p: Dictionary) -> void:
 	params = p
 	gender = _p("gender", "female")
 	_jaw = float(_p("jaw", 0.25 if gender == "male" else 0.36))
+	_base_expression = _p("expression", "friendly")
 	_rng.seed = int(_p("seed", 1))
 	_make_dims()
 	_make_materials()
@@ -170,101 +170,179 @@ func _tube_split(mb, ys: Array, rs: Array, split_y: float, top_color: Color, bot
 	if by.size() >= 2:
 		_tube_ys(mb, by, br, bottom_color, segs)
 
-func _build_pelvis() -> void:
-	var m: bool = _d["m"]
+func _cr(p0: float, p1: float, p2: float, p3: float, t: float) -> float:
+	return 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t * t * t)
+
+func _prof_at(keys: Array, y: float) -> Array:
+	var m := keys.size()
+	var k := 0
+	while k < m - 2 and y < keys[k + 1][0]:
+		k += 1
+	var y1: float = keys[k][0]
+	var y2: float = keys[k + 1][0]
+	var t := clampf((y1 - y) / maxf(y1 - y2, 0.00001), 0.0, 1.0)
+	var p0: Array = keys[maxi(k - 1, 0)]
+	var p1: Array = keys[k]
+	var p2: Array = keys[k + 1]
+	var p3: Array = keys[mini(k + 2, m - 1)]
+	return [y, _cr(p0[1], p1[1], p2[1], p3[1], t), _cr(p0[2], p1[2], p2[2], p3[2], t), _cr(p0[3], p1[3], p2[3], p3[3], t)]
+
+func _ring_tube(mb, keys: Array, y_hi: float, y_lo: float, origin_y: float, color_fn: Callable, step: float, segs: int, breaks: Array = []) -> void:
+	var n := maxi(int(ceil((y_hi - y_lo) / step)), 1)
+	var vals := []
+	for i in n + 1:
+		vals.append(y_hi - (y_hi - y_lo) * float(i) / float(n))
+	for b in breaks:
+		if b < y_hi - 0.001 and b > y_lo + 0.001:
+			vals.append(b)
+			vals.append(b)
+	vals.sort()
+	vals.reverse()
+	var pts := []
+	var radii := []
+	var cols := []
+	var seen := {}
+	for v in vals:
+		var cy: float = v
+		var is_break := false
+		for b in breaks:
+			if absf(b - v) < 0.0002:
+				is_break = true
+		if is_break:
+			var key := snappedf(v, 0.0001)
+			cy = v - 0.0006 if seen.has(key) else v + 0.0006
+			seen[key] = true
+		var pr := _prof_at(keys, v)
+		pts.append(Vector3(0, v - origin_y, pr[3]))
+		radii.append(Vector2(pr[1], pr[2]))
+		cols.append(color_fn.call(cy))
+	mb.tube(pts, radii, Color.WHITE, segs, true, true, cols)
+
+func _limb_keys(rows: Array, length: float, scale: float = 1.0) -> Array:
+	var out := []
+	for r in rows:
+		out.append([-r[0] * length, r[1] * scale, r[2] * scale, 0.0])
+	return out
+
+func _torso_keys() -> Array:
+	var s: float = _d["s"]
+	var mu: float = _d["muscle"]
 	var curve: float = _d["curve"]
-	var pants: Color = params["pants"]
+	var rows: Array
+	if _d["m"]:
+		rows = [
+			[-0.11, 0.096, 0.074, 0.0], [-0.04, 0.116, 0.086, -0.003], [0.03, 0.11, 0.082, 0.0],
+			[0.13, 0.106, 0.079, 0.0], [0.22, 0.122, 0.088, 0.004], [0.30, 0.145 + 0.02 * mu, 0.098 + 0.006 * mu, 0.012],
+			[0.37, 0.158 + 0.03 * mu, 0.091, 0.006], [0.43, 0.166 + 0.03 * mu, 0.08, 0.0],
+			[0.47, 0.112, 0.064, 0.0], [0.5, 0.062, 0.054, 0.0]]
+	else:
+		rows = [
+			[-0.11, 0.092, 0.07, 0.0], [-0.04, 0.112 + 0.014 * curve, 0.086 + 0.004 * curve, -0.005], [0.03, 0.108, 0.08, -0.002],
+			[0.13, 0.088 - 0.008 * curve, 0.064, 0.0], [0.22, 0.095, 0.07, 0.003], [0.30, 0.112, 0.082 + 0.004 * curve, 0.008 + 0.004 * curve],
+			[0.37, 0.121, 0.082, 0.005], [0.43, 0.13, 0.073, 0.0],
+			[0.47, 0.098, 0.06, 0.0], [0.5, 0.055, 0.05, 0.0]]
+	var keys := []
+	for r in rows:
+		keys.push_front([r[0] * s, r[1], r[2], r[3]])
+	return keys
+
+func _torso_color(y: float) -> Color:
+	var s: float = _d["s"]
+	var jacket: Color = params["jacket"]
 	var trim: Color = params["trim"]
-	var hip_r := 0.112 + 0.016 * curve if not m else 0.116
+	var pants: Color = params["pants"]
+	var skin: Color = params["skin"]
+	var top: String = _p("top", "jacket")
+	var yy := y / s
+	if yy < 0.045:
+		return pants
+	if yy < 0.062:
+		return trim
+	if yy < 0.215:
+		return skin if top == "crop" else jacket
+	if yy > 0.472:
+		return skin if top == "crop" or top == "tank" else trim
+	return jacket
+
+func _build_pelvis() -> void:
+	var s: float = _d["s"]
 	var mb := MeshKit.new()
-	_tube_ys(mb, [0.07, 0.01, -0.04, -0.11],
-		[Vector2(hip_r * 0.86, 0.074), Vector2(hip_r, 0.088 + (0.006 * curve if not m else 0.0)), Vector2(hip_r * 0.98, 0.088), Vector2(hip_r * 0.82, 0.07)],
-		pants, 16)
-	_tube_ys(mb, [0.075, 0.05], [Vector2(hip_r * 0.88, 0.076), Vector2(hip_r * 0.9, 0.078)], trim, 16)
+	_ring_tube(mb, _torso_keys(), 0.075 * s, -0.11 * s, 0.0, _torso_color, 0.035 * s, 18, [0.045 * s, 0.062 * s])
 	_node(hips, mb, _toon)
 
+func _leg_color_fn(shorts: bool, th: float, sh: float, part: String) -> Callable:
+	var pants: Color = params["pants"]
+	var skin: Color = params["skin"]
+	var boots: Color = params["boots"]
+	if part == "thigh":
+		return func(y: float) -> Color:
+			if shorts and y < -th * 0.5:
+				return skin
+			return pants
+	return func(y: float) -> Color:
+		if y < -sh * 0.55:
+			return boots
+		return skin if shorts else pants
+
 func _build_legs() -> void:
-	var s: float = _d["s"]
 	var m: bool = _d["m"]
 	var th: float = _d["thigh"]
 	var sh: float = _d["shin"]
+	var mu: float = _d["muscle"]
+	var shorts: bool = _p("legwear", "pants") == "shorts"
+	var boots: Color = params["boots"]
 	var skin: Color = params["skin"]
 	var pants: Color = params["pants"]
-	var boots: Color = params["boots"]
-	var shorts: bool = _p("legwear", "pants") == "shorts"
-	var mu: float = _d["muscle"]
-	var big := 1.0 + (0.06 * mu if m else 0.0)
+	var big := 1.0 + (0.05 * mu if m else 0.0)
+	var thigh_rows: Array = [[0.0, 0.086, 0.09], [0.2, 0.082, 0.086], [0.5, 0.072, 0.076], [0.8, 0.055, 0.059], [1.0, 0.05, 0.054]] if m else [[0.0, 0.08, 0.084], [0.2, 0.077, 0.081], [0.5, 0.066, 0.07], [0.8, 0.052, 0.056], [1.0, 0.047, 0.05]]
+	var shin_rows: Array = [[0.0, 0.05, 0.054], [0.22, 0.058, 0.064], [0.5, 0.045, 0.05], [0.85, 0.032, 0.035], [1.0, 0.031, 0.034]] if m else [[0.0, 0.047, 0.05], [0.2, 0.051, 0.056], [0.45, 0.042, 0.045], [0.8, 0.03, 0.033], [1.0, 0.029, 0.032]]
+	var tk := _limb_keys(thigh_rows, th, big)
+	var sk := _limb_keys(shin_rows, sh, big)
 	for side in [-1.0, 1.0]:
 		var tag := "n" if side < 0 else "p"
 		var thigh := _pivot(hips, Vector3(side * _d["hip_x"], 0, 0), "thigh_" + tag)
 		var mb := MeshKit.new()
-		mb.ellipsoid(Vector3.ZERO, Vector3(0.078, 0.07, 0.08) * big, pants, 10, 14)
-		var ys := [0.0, -th * 0.3, -th * 0.65, -th]
-		var rs := [Vector2(0.077, 0.081) * big, Vector2(0.071, 0.076) * big, Vector2(0.059, 0.063) * big, Vector2(0.05, 0.054) * big]
-		if shorts:
-			_tube_split(mb, ys, rs, -th * 0.55, pants, skin, 12)
-		else:
-			_tube_ys(mb, ys, rs, pants, 12)
+		_ring_tube(mb, tk, 0.0, -th, 0.0, _leg_color_fn(shorts, th, sh, "thigh"), th / 6.0, 14, [-th * 0.5] if shorts else [])
+		mb.ellipsoid(Vector3(0, -0.02, 0), Vector3(0.062, 0.058, 0.066) * big, pants, 10, 14)
 		_node(thigh, mb, _toon)
 		var knee := _pivot(thigh, Vector3(0, -th, 0), "knee_" + tag)
 		var kb := MeshKit.new()
-		var kcol := skin if shorts else pants
-		kb.ellipsoid(Vector3.ZERO, Vector3(0.05, 0.05, 0.052) * big, kcol, 8, 12)
-		var sys := [0.0, -sh * 0.28, -sh * 0.6, -sh]
-		var srs := [Vector2(0.049, 0.053) * big, Vector2(0.053, 0.058) * big, Vector2(0.04, 0.043), Vector2(0.032, 0.036)]
-		_tube_split(kb, sys, srs, -sh * 0.5, kcol, boots, 12)
+		_ring_tube(kb, sk, 0.0, -sh, 0.0, _leg_color_fn(shorts, th, sh, "shin"), sh / 7.0, 14, [-sh * 0.55])
+		kb.ellipsoid(Vector3.ZERO, Vector3(0.048, 0.046, 0.05) * big, skin if shorts else pants, 8, 12)
 		_node(knee, kb, _toon)
 		var ankle := _pivot(knee, Vector3(0, -sh, 0), "ankle_" + tag)
 		var fb := MeshKit.new()
-		fb.ellipsoid(Vector3(0, -0.045, 0.045), Vector3(0.044, 0.04, 0.108), boots, 10, 14)
-		fb.ellipsoid(Vector3(0, -0.01, -0.01), Vector3(0.04, 0.045, 0.045), boots, 8, 12)
+		fb.ellipsoid(Vector3(0, -0.046, 0.04), Vector3(0.042, 0.038, 0.1), boots, 10, 16)
+		fb.ellipsoid(Vector3(0, -0.044, 0.108), Vector3(0.038, 0.03, 0.05), boots, 8, 12)
+		fb.ellipsoid(Vector3(0, -0.02, -0.012), Vector3(0.039, 0.044, 0.044), boots, 8, 12)
 		_node(ankle, fb, _toon)
 
 func _build_upper_body() -> void:
 	var m: bool = _d["m"]
 	var s: float = _d["s"]
-	var mu: float = _d["muscle"]
-	var curve: float = _d["curve"]
 	var jacket: Color = params["jacket"]
-	var trim: Color = params["trim"]
 	var skin: Color = params["skin"]
-	var spine := _pivot(hips, Vector3(0, _d["spine"], 0), "spine")
+	var o_spine: float = _d["spine"]
+	var o_chest: float = o_spine + _d["chest"]
+	var keys := _torso_keys()
+	var breaks := [0.045 * s, 0.062 * s, 0.215 * s, 0.472 * s]
+	var spine := _pivot(hips, Vector3(0, o_spine, 0), "spine")
 	var wb := MeshKit.new()
-	var wr: Array
-	if m:
-		wr = [Vector2(0.112, 0.08), Vector2(0.108, 0.078), Vector2(0.12, 0.086), Vector2(0.134, 0.092)]
-	else:
-		wr = [Vector2(0.104, 0.076), Vector2(0.088 - 0.01 * curve, 0.066), Vector2(0.098, 0.074), Vector2(0.114, 0.084)]
-	_tube_ys(wb, [-0.07, 0.0, 0.08, 0.16 * s], wr, jacket, 16)
-	_tube_ys(wb, [-0.01, -0.035], [Vector2(wr[1].x + 0.004, wr[1].y + 0.004), Vector2(wr[1].x + 0.006, wr[1].y + 0.006)], trim, 16)
+	_ring_tube(wb, keys, o_chest + 0.02, 0.065 * s, o_spine, _torso_color, 0.035 * s, 18, breaks)
 	if "coat" in params["accessories"]:
 		_tube_ys(wb, [-0.04, -0.2, -0.42, -0.62], [Vector2(0.12, 0.092), Vector2(0.15, 0.11), Vector2(0.19, 0.125), Vector2(0.21, 0.135)], jacket.darkened(0.1), 18)
-		_tube_ys(wb, [-0.6, -0.625], [Vector2(0.209, 0.134), Vector2(0.213, 0.138)], trim, 18)
+		_tube_ys(wb, [-0.6, -0.625], [Vector2(0.209, 0.134), Vector2(0.213, 0.138)], params["trim"], 18)
 	_node(spine, wb, _toon)
 	var chest := _pivot(spine, Vector3(0, _d["chest"], 0), "chest")
 	var cb := MeshKit.new()
-	var cr: Array
-	if m:
-		var w := 0.03 * mu
-		cr = [Vector2(0.13, 0.092), Vector2(0.14 + w, 0.1 + 0.01 * mu), Vector2(0.165 + w, 0.094), Vector2(0.14, 0.078), Vector2(0.058, 0.052)]
-	else:
-		cr = [Vector2(0.115, 0.086), Vector2(0.12, 0.094), Vector2(0.138, 0.088), Vector2(0.118, 0.074), Vector2(0.052, 0.048)]
-	_tube_ys(cb, [-0.02, 0.05, 0.12, 0.17 * s, 0.205 * s], cr, jacket, 18)
-	if m:
-		for sd in [-1.0, 1.0]:
-			cb.ellipsoid(Vector3(0.06 * sd, 0.075, 0.07), Vector3(0.06 + 0.012 * mu, 0.048, 0.04), jacket, 8, 12)
-	else:
-		var b := 0.034 + 0.014 * curve
-		for sd in [-1.0, 1.0]:
-			cb.ellipsoid(Vector3(0.05 * sd, 0.07, 0.066), Vector3(b, b * 0.95, b * 0.95), jacket, 8, 12)
-	_tube_ys(cb, [0.205 * s, 0.17 * s], [Vector2(0.062, 0.058), Vector2(0.072, 0.066)], trim, 14)
+	_ring_tube(cb, keys, 0.5 * s, o_chest - 0.02, o_chest, _torso_color, 0.03 * s, 18, breaks)
 	_node(chest, cb, _toon)
 	for side in [-1.0, 1.0]:
 		_build_arm(chest, side)
 	var neck := _pivot(chest, Vector3(0, _d["neck_up"], 0), "neck")
 	var nb := MeshKit.new()
 	var nr := 0.047 if m else 0.034
-	_tube_ys(nb, [-0.02, 0.0, _d["neck_len"] + 0.03], [Vector2(nr * 1.15, nr * 1.15), Vector2(nr * 1.1, nr * 1.1), Vector2(nr, nr)], skin, 12)
+	_tube_ys(nb, [-0.02, 0.0, _d["neck_len"] + 0.03], [Vector2(nr * 1.2, nr * 1.15), Vector2(nr * 1.1, nr * 1.08), Vector2(nr, nr)], skin, 12)
 	_node(neck, nb, _face)
 	var head := _pivot(neck, Vector3(0, _d["neck_len"], 0), "head")
 	head_node = Node3D.new()
@@ -272,55 +350,75 @@ func _build_upper_body() -> void:
 	head.add_child(head_node)
 	_build_head()
 
+func _arm_color_fn(sleeves: String, len_: float, part: String) -> Callable:
+	var jacket: Color = params["jacket"]
+	var trim: Color = params["trim"]
+	var skin: Color = params["skin"]
+	if part == "upper":
+		return func(y: float) -> Color:
+			if sleeves == "long":
+				return jacket
+			if sleeves == "short" and y > -len_ * 0.42:
+				return jacket
+			return skin
+	return func(y: float) -> Color:
+		if sleeves == "long":
+			return trim if y < -len_ + 0.04 else jacket
+		return skin
+
 func _build_arm(chest: Node3D, side: float) -> void:
 	var m: bool = _d["m"]
 	var mu: float = _d["muscle"]
 	var ua: float = _d["ua"]
 	var fa: float = _d["fa"]
 	var jacket: Color = params["jacket"]
-	var trim: Color = params["trim"]
 	var skin: Color = params["skin"]
 	var tag := "n" if side < 0 else "p"
 	var sleeves: String = _p("sleeves", "long")
-	var k := 1.0 + (0.28 * mu if m else 0.0)
+	var k := 1.0 + (0.22 * mu if m else 0.0)
 	var shoulder := _pivot(chest, Vector3(side * _d["sh_x"], _d["sh_up"], 0), "shoulder_" + tag)
 	var mb := MeshKit.new()
-	var jc := jacket if sleeves != "none" else skin
-	var dr: Vector3 = Vector3(0.038, 0.042, 0.038)
+	var urows: Array = [[0.0, 0.054, 0.054], [0.25, 0.057, 0.059], [0.55, 0.05, 0.05], [1.0, 0.04, 0.04]] if m else [[0.0, 0.04, 0.04], [0.25, 0.038, 0.038], [0.6, 0.032, 0.033], [1.0, 0.029, 0.03]]
+	_ring_tube(mb, _limb_keys(urows, ua, k), 0.0, -ua, 0.0, _arm_color_fn(sleeves, ua, "upper"), ua / 5.0, 12, [-ua * 0.42] if sleeves == "short" else [])
+	var jc := jacket if sleeves == "long" or sleeves == "short" else skin
+	var dr := Vector3(0.036, 0.04, 0.036)
 	if m:
-		dr = Vector3(0.052, 0.056, 0.05) * (1.0 + 0.15 * mu)
-	mb.ellipsoid(Vector3(0, -0.01, 0), dr, jc, 10, 14)
-	var uys := [0.0, -ua * 0.3, -ua * 0.62, -ua]
-	var urs: Array
-	if m:
-		urs = [Vector2(0.052, 0.052) * k, Vector2(0.056, 0.058) * k, Vector2(0.047, 0.047) * k, Vector2(0.04, 0.04)]
-	else:
-		urs = [Vector2(0.04, 0.04), Vector2(0.037, 0.037), Vector2(0.032, 0.032), Vector2(0.03, 0.03)]
-	if sleeves == "short":
-		_tube_split(mb, uys, urs, -ua * 0.42, jacket, skin, 12)
-	else:
-		_tube_ys(mb, uys, urs, jc, 12)
+		dr = Vector3(0.05, 0.054, 0.048) * (1.0 + 0.12 * mu)
+	mb.ellipsoid(Vector3(0, -0.012, 0), dr, jc, 10, 14)
 	_node(shoulder, mb, _toon)
 	var elbow := _pivot(shoulder, Vector3(0, -ua, 0), "elbow_" + tag)
 	var eb := MeshKit.new()
-	var ec := jacket if sleeves == "long" else skin
-	eb.ellipsoid(Vector3.ZERO, Vector3(0.034, 0.034, 0.034) * (1.0 + (0.2 * mu if m else 0.0)), ec, 8, 12)
-	var fys := [0.0, -fa * 0.3, -fa * 0.7, -fa]
-	var frs: Array
-	if m:
-		frs = [Vector2(0.04, 0.04) * k, Vector2(0.044, 0.042) * k, Vector2(0.032, 0.03), Vector2(0.026, 0.024)]
-	else:
-		frs = [Vector2(0.03, 0.03), Vector2(0.03, 0.028), Vector2(0.023, 0.021), Vector2(0.02, 0.018)]
-	_tube_ys(eb, fys, frs, ec, 12)
-	if sleeves == "long":
-		_tube_ys(eb, [-fa + 0.045, -fa + 0.01], [Vector2(0.026, 0.026) * (1.0 + (0.4 * mu if m else 0.0)), Vector2(0.028, 0.028) * (1.0 + (0.4 * mu if m else 0.0))], trim, 12)
+	var frows: Array = [[0.0, 0.04, 0.04], [0.25, 0.044, 0.042], [0.7, 0.03, 0.028], [1.0, 0.024, 0.022]] if m else [[0.0, 0.029, 0.029], [0.25, 0.03, 0.029], [0.7, 0.023, 0.021], [1.0, 0.019, 0.017]]
+	_ring_tube(eb, _limb_keys(frows, fa, k if m else 1.0), 0.0, -fa, 0.0, _arm_color_fn(sleeves, fa, "fore"), fa / 5.0, 12, [-fa + 0.04] if sleeves == "long" else [])
+	eb.ellipsoid(Vector3.ZERO, Vector3(0.031, 0.031, 0.031) * (1.0 + (0.2 * mu if m else 0.0)), jacket if sleeves == "long" else skin, 8, 12)
 	_node(elbow, eb, _toon)
 	var wrist := _pivot(elbow, Vector3(0, -fa, 0), "wrist_" + tag)
-	var hb := MeshKit.new()
-	var hsz := 1.18 if m else 1.0
-	hb.ellipsoid(Vector3(0, -0.05, 0.004), Vector3(0.026, 0.044, 0.02) * hsz, skin, 8, 12)
-	hb.ellipsoid(Vector3(0.016 * side, -0.035, 0.012), Vector3(0.011, 0.025, 0.011) * hsz, skin, 6, 8)
-	_node(wrist, hb, _toon)
+	_node(wrist, _hand_mesh(side), _toon)
+
+func _hand_mesh(side: float):
+	var skin: Color = params["skin"]
+	var m: bool = _d["m"]
+	var hs_: float = 1.12 if m else 1.0
+	var mb := MeshKit.new()
+	mb.ellipsoid(Vector3(0, -0.046, 0.002), Vector3(0.027, 0.036, 0.013) * hs_, skin, 8, 12)
+	var xs := [-0.0165, -0.0055, 0.0055, 0.0165]
+	var lens := [0.058, 0.068, 0.064, 0.05]
+	for i in 4:
+		var x: float = xs[i] * hs_ * side
+		var l: float = lens[i] * hs_
+		var pts := [
+			Vector3(x, -0.074, 0.003),
+			Vector3(x * 1.05, -0.074 - l * 0.5, 0.008),
+			Vector3(x * 1.08, -0.074 - l * 0.92, 0.013),
+		]
+		mb.tube(pts, [Vector2(0.0085, 0.0075) * hs_, Vector2(0.0072, 0.0066) * hs_, Vector2(0.0056, 0.005) * hs_], skin, 6)
+	var tp := [
+		Vector3(side * 0.02 * hs_, -0.046, 0.008),
+		Vector3(side * 0.033 * hs_, -0.066, 0.015),
+		Vector3(side * 0.04 * hs_, -0.088, 0.02),
+	]
+	mb.tube(tp, [Vector2(0.0105, 0.009) * hs_, Vector2(0.0085, 0.0075) * hs_, Vector2(0.0065, 0.006) * hs_], skin, 6)
+	return mb
 
 func _build_head() -> void:
 	var skin: Color = params["skin"]
@@ -375,20 +473,24 @@ func _build_face() -> void:
 	var np := [hs(0.0, -0.036) + Vector3(0, 0, 0.002), hs(0.004, -0.05) + Vector3(0, 0, 0.004)]
 	nose.ribbon(np, [0.004, 0.003], Vector3(0, 0, 1), Color(0.75, 0.45, 0.5))
 	_node(head_node, nose, _flat)
-	var mouth := MeshKit.new()
-	var my := -0.079
-	var offs := [0.0, -0.004, 0.0]
-	var kind: String = _p("mouth", "smile")
-	if kind == "flat":
-		offs = [0.0, 0.0, 0.0]
-	elif kind == "smirk":
-		offs = [-0.002, -0.004, 0.006]
-	var mp := []
-	for i in 3:
-		var mx := (i - 1) * 0.018
-		mp.append(hs(mx, my + offs[i]) + Vector3(0, 0, 0.004))
-	mouth.ribbon(mp, [0.003, 0.0045, 0.003], Vector3(0, 0, 1), Color(0.6, 0.22, 0.32))
-	_node(head_node, mouth, _flat)
+	_mouths = {}
+	var kinds := {
+		"neutral": [0.0, 0.0, 0.0, 0.016],
+		"friendly": [0.0, -0.0028, 0.0, 0.018],
+		"happy": [0.003, -0.0065, 0.003, 0.023],
+	}
+	for kind in kinds:
+		var mk: Array = kinds[kind]
+		var mouth := MeshKit.new()
+		var mp := []
+		for i in 3:
+			var mx := (i - 1) * float(mk[3])
+			mp.append(hs(mx, -0.079 + float(mk[i])) + Vector3(0, 0, 0.004))
+		mouth.ribbon(mp, [0.003, 0.0045, 0.003], Vector3(0, 0, 1), Color(0.6, 0.22, 0.32))
+		var mi2 := _node(head_node, mouth, _flat)
+		mi2.visible = false
+		_mouths[kind] = mi2
+	_show_mouth(_p("expression", "friendly"))
 
 func _head_dir_point(a: float, y: float, k: float) -> Vector3:
 	return Vector3(sin(a) * HX * k, y, -cos(a) * HZ * k)
@@ -570,21 +672,37 @@ func set_blink(amount: float) -> void:
 	for m in eye_mats:
 		m.set_shader_parameter("open", 1.0 - clampf(amount, 0.0, 1.0) * 0.92)
 
+func _show_mouth(kind: String) -> void:
+	for k in _mouths:
+		_mouths[k].visible = (k == kind)
+
 func set_happy(w: float) -> void:
 	_happy = w
 	for m in eye_mats:
 		m.set_shader_parameter("happy", w)
+	_show_mouth("happy" if w > 0.5 else _base_expression)
 
 func emotes() -> Array:
 	if gender == "female":
-		return ["pirouette", "twirl_jump", "cheer", "wave"]
-	return ["flex", "fist_pump", "cheer", "wave"]
+		return ["pirouette", "twirl_jump", "cheer", "wave", "nod"]
+	return ["flex", "fist_pump", "cheer", "wave", "nod"]
+
+func celebrate(level: int) -> void:
+	var pick: String
+	if level <= 1:
+		pick = "nod"
+	elif level == 2:
+		var opts := ["cheer", "twirl_jump" if gender == "female" else "fist_pump"]
+		pick = opts[_rng.randi() % opts.size()]
+	else:
+		pick = "pirouette" if gender == "female" else "flex"
+	play_emote(pick)
 
 func happy() -> void:
-	play_emote(emotes()[0] if _rng.randf() < 0.6 else emotes()[_rng.randi() % emotes().size()])
+	celebrate(3)
 
 func play_emote(name: String) -> void:
-	var durs := {"pirouette": 2.1, "twirl_jump": 1.3, "cheer": 1.5, "wave": 2.2, "flex": 1.9, "fist_pump": 1.3}
+	var durs := {"pirouette": 2.1, "twirl_jump": 1.3, "cheer": 1.5, "wave": 2.2, "flex": 1.9, "fist_pump": 1.3, "nod": 1.0}
 	if not durs.has(name):
 		return
 	_emote = name
@@ -664,6 +782,10 @@ func _emote_pose(T: Dictionary) -> void:
 			T["thigh_p"] = Vector3(0, 0, 0.1 * w)
 			T["chest"] = Vector3(-0.08 * w, 0, 0)
 			T["head"] = Vector3(-0.08 * w, 0, 0)
+		"nod":
+			T["head"] = Vector3(sin(_emote_t * 7.0) * 0.14 * w, 0, 0)
+			T["shoulder_p"] = Vector3(-0.15 * w, 0, 0.3 * w)
+			T["elbow_p"] = Vector3(-0.9 * w, 0, 0)
 		"fist_pump":
 			var h3 := absf(sin(PI * 2.0 * u))
 			_body_y = 0.1 * h3
@@ -684,14 +806,6 @@ func update_pose(vel: Vector3, grounded: bool, gliding: bool, dashing: bool, fac
 		cancel_emote()
 	if _emote == "":
 		set_happy(maxf(_happy - delta * 4.0, 0.0))
-		if grounded and speed < 0.05:
-			_idle_t += delta
-			if auto_emotes and _idle_t > _next_fidget:
-				happy()
-				_next_fidget = 9.0 + _rng.randf() * 8.0
-				_idle_t = 0.0
-		else:
-			_idle_t = 0.0
 	var sp := minf(speed, 1.0)
 	if grounded and speed > 0.05:
 		_phase += delta * (5.5 + 8.0 * sp)
