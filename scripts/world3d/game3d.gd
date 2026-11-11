@@ -5,7 +5,7 @@ const PlayerSim = preload("res://scripts/core3d/player_sim.gd")
 const TerrainMesher = preload("res://scripts/world3d/terrain_mesher.gd")
 const TouchControls = preload("res://scripts/world3d/touch_controls.gd")
 const AnimeAvatar = preload("res://scripts/world3d/anime_avatar.gd")
-const AvatarPresets = preload("res://scripts/world3d/avatar_presets.gd")
+const AvatarConfig = preload("res://scripts/world3d/avatar_config.gd")
 const Challenge = preload("res://scripts/core3d/challenge.gd")
 const ChallengeTracker = preload("res://scripts/core3d/challenge_tracker.gd")
 const Progress = preload("res://scripts/core3d/progress.gd")
@@ -14,7 +14,6 @@ const SaveStore = preload("res://scripts/core/save_store.gd")
 const FP := 1024.0
 const WORLD_SEED := 20241111
 const MAX_LOG := 216000
-const AVATAR_PRESET := 0
 
 var world
 var sim
@@ -61,7 +60,7 @@ func _ready() -> void:
 	_build_rings()
 	AnimeAvatar.light_dir = sun.basis.z
 	avatar = AnimeAvatar.new()
-	avatar.build(AvatarPresets.get_preset(AVATAR_PRESET))
+	avatar.build(AvatarConfig.to_params(AvatarConfig.load_config()))
 	add_child(avatar)
 	cam = Camera3D.new()
 	cam.fov = 70.0
@@ -227,6 +226,15 @@ func _build_hud() -> void:
 	fps_label = _hud_label(layer, Vector2(24, 62), 22)
 	toast_label = _hud_label(layer, Vector2(24, 100), 30)
 	level_label = _hud_label(layer, Vector2(1010, 18), 34)
+	var style_btn := Button.new()
+	style_btn.text = "Style"
+	style_btn.position = Vector2(1130, 100)
+	style_btn.size = Vector2(130, 52)
+	style_btn.add_theme_font_size_override("font_size", 24)
+	style_btn.pressed.connect(func() -> void:
+		SaveStore.save_progress(save_data)
+		get_tree().change_scene_to_file("res://scenes/character_editor.tscn"))
+	layer.add_child(style_btn)
 	xp_bar = ProgressBar.new()
 	xp_bar.position = Vector2(1010, 66)
 	xp_bar.size = Vector2(246, 16)
