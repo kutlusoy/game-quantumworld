@@ -4,11 +4,13 @@ const VoxelWorld = preload("res://scripts/core3d/voxel_world.gd")
 const PlayerSim = preload("res://scripts/core3d/player_sim.gd")
 const ChunkMesher = preload("res://scripts/world3d/chunk_mesher.gd")
 const TouchControls = preload("res://scripts/world3d/touch_controls.gd")
-const AvatarPlaceholder = preload("res://scripts/world3d/avatar_placeholder.gd")
+const AnimeAvatar = preload("res://scripts/world3d/anime_avatar.gd")
+const AvatarPresets = preload("res://scripts/world3d/avatar_presets.gd")
 
 const FP := 1024.0
 const WORLD_SEED := 20241111
 const MAX_LOG := 216000
+const AVATAR_PRESET := 0
 
 var world
 var sim
@@ -18,7 +20,7 @@ var touch
 var sun: DirectionalLight3D
 var yaw := 0.0
 var pitch := 0.45
-var dist := 7.5
+var dist := 5.4
 var prev_pos := Vector3.ZERO
 var cur_pos := Vector3.ZERO
 var last_vel := Vector3.ZERO
@@ -41,7 +43,9 @@ func _ready() -> void:
 	_build_environment()
 	_build_world_meshes()
 	_build_shards()
-	avatar = AvatarPlaceholder.new()
+	AnimeAvatar.light_dir = sun.basis.z
+	avatar = AnimeAvatar.new()
+	avatar.build(AvatarPresets.get_preset(AVATAR_PRESET))
 	add_child(avatar)
 	cam = Camera3D.new()
 	cam.fov = 70.0
