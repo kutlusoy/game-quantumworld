@@ -1,10 +1,14 @@
-# Quantum World: Decisions and Self-Sustaining Design (Draft v0.1)
+# Quantum World: Decisions and Self-Sustaining Design (Draft v0.2)
 
 ## 1. Decisions
 
-1. **Closed-loop game currency.** Quanta is earned by playing and spent in the game. No purchase with fiat, no cash-out, no exchange integration, no earning-potential marketing. This resolves open question 1 of `CHAIN-DESIGN.md` and the legal recommendation in its section 9.
-2. **No central servers.** No account server, no matchmaking server, no analytics backend, no operator-controlled bootstrap, no hosted snapshot download.
-3. **Self-sustaining where possible.** The running game should cost the developer close to nothing to operate, and the in-game economy should balance itself.
+1. **Quanta is a closed-loop, earn-only currency.** It is earned by playing and spent in the game. It is never sold for money, cannot be cashed out and has no exchange integration.
+2. **No central game servers.** No account server, no matchmaking server, no analytics backend, no operator-controlled bootstrap, no hosted snapshot download. One optional exception: the Shop Keeper service (section 5.2).
+3. **Revenue model: free to play, cosmetic monetization.** The developer earns through Crystals (premium shop credit), a seasonal pass, limited cosmetic drops and convenience slots. See section 5.
+4. **Never:** advertising, paid random loot boxes, pay-to-win items, selling Quanta.
+5. **Self-sustaining where possible:** near-zero operating cost, self-balancing in-game economy.
+
+The two-currency model and the Shop Authority role are specified in `IDENTITY-SHOP.md` section 1. Its conflict note (section 1.1) is resolved by this document: Quanta stays unsold, Crystals are sold.
 
 ## 2. Infrastructure Without Servers
 
@@ -15,6 +19,8 @@
 | Ledger validation | Keepers (volunteer nodes) | See section 3 |
 | State snapshots for new nodes | Any peer holding a verified snapshot | Verified against the attested hash, so peers need no trust |
 | Universe data, avatars | Owner's device plus peers that cache it | Only hashes live on chain |
+| Shop catalogue | Signed list spread P2P | No web server |
+| Purchase confirmation | Shop Keeper service (optional, section 5.2) | The only operator-run component |
 | App distribution | F-Droid, signed APK, optionally Google Play | No update server needed beyond those channels |
 | Telemetry | None | |
 
@@ -34,37 +40,52 @@ With a closed-loop currency, running a Keeper earns nothing that can be sold. So
 ## 4. A Self-Balancing In-Game Economy
 
 - **Sources** are fixed per epoch by the emission schedule and split into event pools (`CHAIN-DESIGN.md` section 6). Nothing is minted outside those pools.
-- **Sinks** are universe building, teleport upgrades, event entry, cosmetics and burned fees. At maturity, sinks should absorb at least what sources emit, so the currency does not inflate.
+- **Sinks** are universe building, teleport upgrades, event entry, Quanta-priced shop items, nickname registration and burned fees. At maturity, sinks should absorb at least what sources emit, so the currency does not inflate.
+- **Crystals are separate.** They are minted only by the Shop Authority against a confirmed payment and burned when spent, so they never build a float and never touch the Quanta supply.
 - **No central economy controller.** Parameters are consensus rules. Changes ship as scheduled protocol upgrades in app releases and take effect at an announced epoch. Users choose whether to update; there is no remote switch.
 - **Before launch:** the economy simulator (roadmap phase 2.5) must show stable balances under normal, bot-heavy and Sybil-heavy populations.
 
 Limit to be honest about: app releases are signed by the developer, so protocol upgrades are not fully trustless. Open governance for upgrades is a later topic.
 
-## 5. How the Project Pays for Itself
+## 5. Revenue Model
 
-Operating cost target: near zero (no servers, no domain required, no bandwidth bills). What remains is development, art, music, audits, legal review and store fees. "Self-sustaining" therefore applies to operations. Funding development needs revenue or volunteers.
+Operating cost target: near zero. What remains is development, art, music, audits, legal review, store fees and user acquisition. "Self-sustaining" applies to operations; paying for development needs the revenue below.
 
-Options compatible with closed-loop and no servers (can be combined):
-
-| Option | Works without a server? | Notes |
+### 5.1 Products
+| Product | Description | Notes |
 |---|---|---|
-| One-time premium purchase | Yes, store handles it | Simplest; fits a casual audience |
-| Cosmetic packs via store billing | Yes, receipts checked on the device | Unlocks are local and non-transferable, never sold as Quanta |
-| Voluntary donations | Yes | Optional "supporter badge" signed offline with a developer key; verifiable by anyone, grants no gameplay power |
-| Grants and open source funding | Yes | Fits the open, decentralized design |
-| Ads | Needs ad networks, conflicts with anonymity | Not recommended |
+| **Crystal packs** | Premium shop credit, bundles from about 0.99 to 99.99 EUR, first-purchase bonus | Main revenue. Not transferable, not convertible to money, burned on spend |
+| **Quantum Pass (season pass)** | Free and premium reward track per season, cosmetics only, tied to the season events | Strong retention driver, new content each season |
+| **Limited drops and bundles** | Time-limited signed catalogue entries: outfits, auras, world skins, music tracks | Scarcity without randomness |
+| **Convenience slots** | Extra universe and avatar slots | Never required for progress |
+| **Supporter pack / donations** | Optional, supporter badge signed offline | No gameplay power |
 
-Hard rule: store purchases never convert into Quanta and Quanta never converts into money. That keeps the currency closed-loop.
+Rules: cosmetics and convenience only, fixed visible prices, no paid randomized rewards, no gameplay advantage. Quanta-priced shop items act as a sink and are earnable by playing.
+
+### 5.2 Shop Keeper service (the one server)
+To confirm a purchase with the payment provider and sign the Crystal issue, the admin runs a small Shop Keeper service (can be an onion service, small VPS). If it is offline, only purchases and pass activation pause; playing, earning, trading and the Quanta shop continue.
+
+### 5.3 Distribution and payments
+- Google Play generally requires its own billing for digital goods and charges a fee. In many countries Google acts as merchant of record and handles sales tax. Verify the current policy before building.
+- F-Droid builds cannot use Play billing; offer donations or a separate payment option there.
+- Check consumer law for selling virtual currency (clear pricing, minors, refunds) and your own tax and business obligations.
+
+### 5.4 Protecting revenue in an open design
+An open client can be forked and its shop bypassed. Protection is structural: Crystals and shop items are valid only if signed by the Shop Authority key on the official chain. A fork gets its own empty chain and no existing players. Keep art, music and brand under a proprietary license, not an open one.
+
+### 5.5 Validate before building the chain
+The phase 1 vertical slice should be soft-launched to measure retention and payer conversion. Rough casual-game orientation (not a forecast): about 35 to 40 percent day-1 retention and 1 to 3 percent paying users. If retention is weak, fix the game before building the network.
 
 ## 6. Impact on Other Documents
 
-- `CHAIN-DESIGN.md` section 12, question 1: answered (closed-loop). Questions 2 to 5 remain open.
-- `PLAN.md` section 5.7 (monetization): use the table in section 5 above. Donations by Monero/Lightning remain possible as voluntary supporter funding, not as an in-game currency purchase.
-- `PLAN.md` section 4.3: the bootstrap list is explicitly a hint, not an authority.
+- `CHAIN-DESIGN.md` is updated for Crystals, shop items and the Shop Authority.
+- `PLAN.md` section 5.7 is replaced by section 5 above.
 
 ## 7. Open Questions
 
-1. Premium one-time price vs free with cosmetic packs, or both?
-2. Retire developer seed Keepers after a fixed date or a Keeper-count threshold?
-3. Which Keeper-only cosmetics are attractive enough to motivate volunteers?
-4. Do you want an open governance process for protocol upgrades, or developer-signed releases only?
+1. Who operates the Shop Keeper service and holds the Shop Authority key; multisig from the start?
+2. Crystal price ladder, pass price and season length?
+3. Seed phrase as default account, with email + password only as an optional strong-passphrase login (`IDENTITY-SHOP.md` section 3)?
+4. Unique paid nicknames, tagged free nicknames, or both?
+5. Retire developer seed Keepers after a fixed date or a Keeper-count threshold?
+6. Open governance for protocol upgrades, or developer-signed releases only?

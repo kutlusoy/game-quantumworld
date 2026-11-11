@@ -1,18 +1,18 @@
-# Quantum World: Ledger Design (Draft v0.1)
+# Quantum World: Ledger Design (Draft v0.2)
 
-This document extends sections 4.4 and 4.5 of `PLAN.md`. Where the two differ, this document wins. Like the rest of the networking, the ledger is invisible to players: no wallets, no addresses, no fees, no crypto vocabulary in the UI. Players see "Quantum Energy" and their universe.
+This document extends sections 4.4 and 4.5 of `PLAN.md`. Where the two differ, this document wins. Business decisions are in `SUSTAINABILITY.md`; shop, accounts and addresses are in `IDENTITY-SHOP.md`. Like the rest of the networking, the ledger is invisible to players: no wallets, no addresses, no gas, no crypto vocabulary in the UI. Players see "Quantum Energy", Crystals and their universe.
 
 ## 1. Goals and Non-Goals
 
 **Goals**
-1. A tamper-evident shared ledger for the things that must be shared: the currency, rare items, universe ownership commitments, one-time discoveries, event results.
+1. A tamper-evident shared ledger for the things that must be shared: the currency, rare items, universe ownership commitments, one-time discoveries, event results, shop issuance.
 2. No proof of work. No mining hardware, no battery drain.
 3. Bounded storage forever: old blocks are pruned, integrity is preserved by per-block state attestation (the Elektron Net principle).
 4. Runs over the Tor/I2P layer from `PLAN.md`, tolerant of 0.3 to 2 s latency.
 5. The game stays fully playable offline; the ledger only syncs in the background.
 
 **Non-goals (v1)**
-- No exchange listing, no fiat purchase of the currency, no cashing out (see section 9).
+- No exchange listing, no purchase of Quanta with money, no cashing out of any currency (see section 9).
 - No smart-contract VM. Game rules are consensus code, not user scripts.
 - No on-chain gameplay. Levels are played locally; only signed claims are submitted.
 
@@ -40,7 +40,7 @@ Recommendation for v1: a simple **linear chain** with one leader per slot and co
 
 ### 4.1 Roles
 - **Players (light clients):** phones. Hold their own keys and leaves, verify epoch checkpoints and their own state proofs. They do not produce blocks.
-- **Keepers (validators):** opt-in nodes (Raspberry Pi, VPS, desktop, or a phone charging on Wi-Fi). They lock Quanta as stake to participate. Anyone can become a Keeper; there is no admin key and no whitelist.
+- **Keepers (validators):** opt-in nodes (Raspberry Pi, VPS, desktop, or a phone charging on Wi-Fi). They lock Quanta as stake to participate. Anyone can become a Keeper; there is no admin key and no whitelist for block production.
 
 Honest tradeoff: most players are light clients, so day-to-day validation is done by Keepers. It stays decentralized as long as Keeper participation is open and the Keeper set is large and diverse, which is a social and incentive problem as much as a technical one (see risks).
 
@@ -65,10 +65,13 @@ Consensus is the riskiest component. Evaluate existing building blocks (a BFT-st
 ### 5.1 State model
 The ledger is a set of **leaves**, each a small canonical byte string:
 - `Account(pubkey, quanta_balance, nonce)`
-- `Item(item_id, owner)` for rare cosmetics and world deeds
+- `Crystals(pubkey, balance)`: shop credit, minted only by the Shop Authority, burned on spend, not transferable
+- `Item(item_id, owner)` for rare cosmetics and world deeds; shop-issued items are non-transferable
+- `Name(nickname, owner)`: optional unique nickname registration
 - `UniverseRoot(owner, hash)`: only a hash of the player's universe; the universe data itself lives P2P and is never stored on chain
 - `Discovery(discovery_id, first_finder)`: one-time global claims
 - `ClearBitmap(pubkey, bitmap)`: which levels have paid out their one-time reward
+- `ShopAuthority(keyset, threshold)`: the recognised Shop Authority key (multisig)
 
 Keeping bulky game data off chain is the main reason the chain stays small.
 
@@ -91,9 +94,11 @@ Tradeoff: MuHash gives whole-state integrity but no inclusion proofs. Therefore,
 
 No trusted server, no full-history download, no unbounded growth.
 
-## 6. Currency and Minting by Events
+## 6. Currencies and Minting by Events
 
-Name (working): **Quanta**, internally integer units. Everything is minted by **events**, never by hashing.
+Two currencies (see `SUSTAINABILITY.md`):
+- **Quanta:** earn-only, minted by events, never sold. Everything in sections 6.1 to 6.5 concerns Quanta.
+- **Crystals:** premium shop credit, minted only by the Shop Authority against a confirmed payment (section 6.6).
 
 ### 6.1 Emission
 - A fixed emission schedule defined in consensus: a per-epoch budget that halves on a long cycle (e.g. every 2 years), with a hard supply cap. Numbers are placeholders until the economy is simulated.
@@ -105,7 +110,7 @@ Name (working): **Quanta**, internally integer units. Everything is minted by **
 | **Daily Fluctuation** | Epoch randomness picks a modifier and a set of "hot" levels | Players with a verified clear of a hot level share the pool pro rata by score |
 | **Raid** | Cooperative mega level; many players submit partial progress claims | Released when global progress passes a threshold, split by verified contribution |
 | **Discovery** | First finder of a secret path, hidden level or new world | One fixed reward per discovery, first valid claim on chain wins |
-| **Season / Tournament** | Time-boxed score race, deterministic seed | Top-N by verified score |
+| **Season / Tournament** | Time-boxed score race, deterministic seed | Top-N by verified score; the season also drives the Quantum Pass track |
 | **First Clear** | First time a level is cleared by an account | Small fixed amount per level, recorded in `ClearBitmap` |
 | **Keeper reward** | Producing and attesting blocks | Fixed share of the epoch budget plus burned-fee rebate, pro rata to stake and uptime |
 
@@ -113,11 +118,19 @@ Name (working): **Quanta**, internally integer units. Everything is minted by **
 A claim contains: level id, level seed commitment, compact move list (~100 to 300 bytes), claimed score, signature. Levels are deterministic, so a Keeper replays the moves in milliseconds and checks the score. Payout amounts are functions of the level id and event rules in consensus; the claimant never chooses an amount. Invalid claims burn the submission fee. Committee members spot-verify claims in bulk to keep phones and Pis cheap.
 
 ### 6.4 Sinks (keep the economy alive)
-Universe building, teleport upgrades, rare cosmetics, event entry, fees (small, auto-deducted, burned). The UI shows none of this as currency math, only as "Quantum Energy".
+Universe building, teleport upgrades, rare cosmetics, event entry, Quanta-priced shop items, nickname registration, and fees (small, auto-deducted, burned). The UI shows none of this as currency math, only as "Quantum Energy".
 
 ### 6.5 Bots and Sybils (be honest)
 - Splitting play across many identities does not raise total payouts because pools are fixed per epoch and distributed pro rata by verified score. Sybils are neutral, not profitable.
 - Bots that solve match-3 puzzles can still win a share. They cannot be fully prevented without identity. Mitigations: per-account daily caps on paid activity, minimum human-plausible move timing, harder events weighted toward cooperative or social play, and stake-weighted rather than count-weighted tournament rewards. Treat this as a continuing tuning problem, not a solved one.
+
+### 6.6 Crystals and the Shop Authority
+The consensus recognises one **Shop Authority** (multisig keyset, rotation through a scheduled protocol upgrade) with exactly three transaction types:
+- `PublishCatalogue(entries)`: signed shop catalogue, also gossiped P2P
+- `IssueCrystals(account, amount, receipt_ref)`
+- `IssueItem(account, item_id)`
+
+Players spend Crystals with `PurchaseItem(item_id)`, which burns the Crystals and creates the `Item` leaf. Consensus **rejects** any Shop Authority transaction that changes Quanta balances, removes or alters items or balances, changes rules or halts the chain. Crystals are never transferable and never convertible. Payment confirmation is done off chain by the Shop Keeper service (`SUSTAINABILITY.md` section 5.2); the chain only sees the signed issue.
 
 ## 7. Privacy
 
@@ -125,6 +138,7 @@ Universe building, teleport upgrades, rare cosmetics, event entry, fees (small, 
 - The ledger is public and pseudonymous. Transfers are visible to everyone who holds recent blocks. Confidential amounts and unlinkable transfers are out of scope for v1 (possible later work).
 - Pruning removes history older than the retention window.
 - Network identity is hidden by the Tor/I2P layer, including for Keepers.
+- Purchases: the payment provider knows the buyer, the chain only sees `receipt_ref` as an opaque reference. Use a salted hash so the chain cannot be linked to the payment record without the Shop Keeper.
 
 ## 8. Invisible Ledger UX
 
@@ -132,12 +146,14 @@ Universe building, teleport upgrades, rare cosmetics, event entry, fees (small, 
 - Claims are submitted automatically in the background after a level; the player sees stars and Quantum Energy immediately (optimistic local display), final confirmation arrives later.
 - Keys are created silently, backed up by the same seed phrase as the identity.
 - If the chain is unreachable, claims queue locally and are retried; claims carry an epoch validity window so stale ones expire cleanly.
+- The shop is a normal in-game screen with clear prices; a purchase shows a short "confirming" state until the Shop Authority issue is final.
 
 ## 9. Legal and Store Considerations (needs review before building)
 
-- A transferable, tradeable currency can trigger financial and crypto-asset regulation (for example MiCA in the EU, securities and money transmission rules elsewhere) and store policies on blockchain and real-money features.
-- Recommendation for v1: **Quanta is a closed-loop game currency**: earn by playing, spend in game, no purchase for fiat, no exchange integration, no marketing of earning potential. Transferability between players can stay limited to gifts and trades of items.
-- Get legal advice before enabling any path from Quanta to money.
+- **Decided:** Quanta is a closed-loop game currency. Earn by playing, spend in game, no purchase with money, no exchange, no cash-out, no earning-potential marketing.
+- **Crystals** are sold as premium shop credit. They are not transferable, not redeemable for money and burned on spend, which keeps them outside the tradeable-token model. Still check consumer law (pricing transparency, minors, refund rights), store billing policy and tax duties before enabling sales.
+- Do not sell paid randomized rewards. Disclose all prices.
+- Get legal advice before enabling any path from Quanta or Crystals to money.
 
 ## 10. Roadmap Additions
 
@@ -146,6 +162,7 @@ Universe building, teleport upgrades, rare cosmetics, event entry, fees (small, 
 | 2.5: Ledger spec and simulator | Leaf formats, claim format, emission model, economy simulation with bots and Sybils; `ChainBackend` interface with a local single-node implementation so the game works end to end | Spec v1, simulator results |
 | 3a: Private testnet | 5 to 10 Keepers on Tor, slots, VRF leaders, committee finality, attestation, snapshot sync | Chain that survives churn and restarts |
 | 3b: Pruning and bootstrap | Retention window, epoch checkpoints, snapshot bootstrap, light client proofs | New node syncs from checkpoint |
+| 3c: Shop | Shop Authority, Crystals, catalogue gossip, Shop Keeper service, store billing integration, Quantum Pass | First real purchases in a closed beta |
 | 4: Public testnet | Open Keepers, event pools live, economy tuning, security review | Long-running testnet (at least 3 months) |
 | 5: Mainnet | Only after testnet, audit and legal review | Launch |
 
@@ -160,14 +177,18 @@ The single-player game must never wait for the chain. The chain starts as a thin
 | Stake concentration | Stake caps per key per epoch, age requirement, slashing, committee rotation |
 | Bots farming events | Pro rata fixed pools, caps, timing heuristics, tuning loop |
 | Latency over Tor | 12 s slots, small blocks, parallel Tor/I2P, tolerant timeouts |
-| Regulation and store policy | Closed-loop currency, legal review, no cash-out in v1 |
-| Economy exploits (inflation, farm loops) | Fixed emission, simulation before launch, kill switch via hard fork schedule |
+| Regulation and store policy | Closed-loop Quanta, non-convertible Crystals, legal review, no cash-out |
+| Economy exploits (inflation, farm loops) | Fixed emission, simulation before launch, scheduled protocol upgrades |
+| Shop Authority key compromise | Multisig, key rotation procedure, consensus limits on what the key can do |
+| Shop Keeper is a single operator-run service | Optional, only pauses purchases, can be redeployed from the same key setup |
+| Forks bypassing the shop | Crystals valid only with the Shop Authority signature on the official chain, proprietary art and brand |
 | Data growth | Retention window, off-chain universe data, epoch checkpoints only |
 
 ## 12. Open Questions
 
-1. Closed-loop currency in v1 (recommended), or do you want a tradeable coin from the start?
-2. Should phones act as Keepers while charging on Wi-Fi, or only dedicated nodes?
-3. Retention window: 30 days (default here) or longer, like the 137 days of Elektron Net?
-4. Reuse of Elektron Net code (same license family as Bitcoin Core) for MuHash and snapshot logic, or a clean implementation in the game's language?
-5. Total supply and halving schedule: fixed cap as in Elektron Net, or an inflationary reward curve?
+1. Should phones act as Keepers while charging on Wi-Fi, or only dedicated nodes?
+2. Retention window: 30 days (default here) or longer, like the 137 days of Elektron Net?
+3. Reuse of Elektron Net code (same license family as Bitcoin Core) for MuHash and snapshot logic, or a clean implementation in the game's language?
+4. Total supply and halving schedule: fixed cap as in Elektron Net, or an inflationary reward curve?
+
+Answered: closed-loop currency (see `SUSTAINABILITY.md`).

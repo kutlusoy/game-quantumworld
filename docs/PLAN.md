@@ -1,6 +1,8 @@
 # Quantum World: Project Plan and Gameplay Sketch
 
-Status: Draft v0.1
+Status: Draft v0.2
+
+Related documents: `CHAIN-DESIGN.md` (ledger), `SUSTAINABILITY.md` (decisions and revenue model), `IDENTITY-SHOP.md` (shop, accounts, addresses).
 
 ## 1. Vision
 
@@ -19,10 +21,12 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 |---|---|---|
 | Engine | **Godot 4** (or Unity) | Godot is open source, has a small APK and handles mixed 2D/3D well, which fits the decentralized philosophy. Unity has more Android tooling but carries licensing and privacy baggage. |
 | Core gameplay | **Match-3 / puzzle hybrid on a world map** | Proven to be addictive, very easy, one-thumb friendly, and levels are easy to interconnect. |
-| Identity | **Cryptographic key pair (Ed25519) on the device** | No account server. The identity is the key. Backup via seed phrase (12 words). |
+| Identity | **Cryptographic key pair (Ed25519) on the device** | No account server. The identity is the key. Backup via seed phrase (12 words). Details in `IDENTITY-SHOP.md`. |
 | Network | **libp2p-style P2P over Tor/I2P transports** | See section 4. |
+| Ledger | **Attested, pruned, non-PoW chain** | See `CHAIN-DESIGN.md`. |
 | Data | **Local first + CRDTs** | Save data lives on the device, sync works without a central instance. |
 | 3D avatars | **Modular kit (VRM/glTF parts)** | Small files, cheap to transmit over P2P (parameters only, no mesh upload). |
+| Business model | **Free to play, cosmetic monetization** | See section 5.7 and `SUSTAINABILITY.md`. |
 
 **Reality checks**
 - **Tor/I2P on Android** is feasible (Tor via `tor-android`/Arti, I2P via `i2pd` or the I2P Android library). However, **latency is 300 ms to 2 s**, so **real-time action multiplayer is out**. The planned turn-based/asynchronous design fits this well.
@@ -35,16 +39,18 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 
 ```
 +---------------- Android App (Godot) ----------------+
-| UI/Gameplay | Avatar kit | Audio engine              |
+| UI/Gameplay | Avatar kit | Audio engine | Shop         |
 +------------------------------------------------------+
 | Local save data (SQLite, encrypted, CRDT)             |
 | Identity: Ed25519 key + seed backup                   |
 +------------------------------------------------------+
-| P2P layer (libp2p/gossip/DHT)                         |
-|   Transports: Tor (onion services) | I2P | direct     |
+| Ledger client (light client, ChainBackend)            |
 +------------------------------------------------------+
-| Optional: bootstrap/relay nodes (anyone can run one,  |
-| no trust required)                                    |
+| P2P layer (libp2p/gossip/DHT)                         |
+|   Transports: Tor (onion services) | I2P              |
++------------------------------------------------------+
+| Optional: bootstrap/relay nodes, Keepers, Shop Keeper |
+| (anyone can run the first two, no trust required)     |
 +------------------------------------------------------+
 ```
 
@@ -52,11 +58,11 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 
 ### 4.1 Identity
 - On first start: generate a key pair, pick a display name and avatar. **No registration, no login.**
-- Public key = player ID. Seed phrase for restoring on a new device.
+- Public key = player ID. Seed phrase for restoring on a new device. Optional strong-passphrase login: see `IDENTITY-SHOP.md` section 3 (proposal).
 - Optional: device-to-device transfer via QR code.
 
 ### 4.2 Transport
-- Every client publishes itself as a **Tor v3 onion service** and/or an **I2P destination**.
+- Every client publishes itself as a **Tor v3 onion service** and/or an **I2P destination**, with persistent keys and signed address records (see `IDENTITY-SHOP.md` section 2).
 - **No user-facing transport settings.** An internal transport manager chooses automatically: it starts Tor and I2P in parallel, uses whichever connects first and keeps the other as a fallback. If both fail, the game stays fully playable offline and retries silently.
 - Direct connections are never used for anything that exposes an IP address.
 - An advanced/developer option may exist in a hidden menu, but is not part of the normal UI.
@@ -64,12 +70,12 @@ A colorful, cheerful Android game with real addiction potential: very easy to le
 ### 4.3 Discovery and Lobby without a Central Server
 - **DHT (Kademlia)** to find lobbies ("rooms") by hash (e.g. room "Sakura Plaza").
 - **Gossip PubSub** per room for presence, emotes and chat.
-- **Bootstrap list**: built-in plus community-maintainable list of nodes (onion addresses). If everything fails: invite links/QR codes between friends.
+- **Bootstrap list**: built-in plus community-maintainable list of nodes (onion addresses), a starting hint and never an authority. If everything fails: invite links/QR codes between friends.
 - Lobby size per instance max. ~20 to 30 avatars (more is too much traffic over Tor); multiple instances of the same room are created automatically.
 
 ### 4.4 Save Data and Anti-Cheat
 - Solo progress: local, cheating only affects the cheater.
-- Shared features (leaderboards, trading, events): **signed results plus replay hash**; opponents/witnesses verify by replaying (levels are deterministic via seed).
+- Shared features (leaderboards, trading, events): **signed results plus replay hash**; opponents/witnesses verify by replaying (levels are deterministic via seed). The ledger for shared state is specified in `CHAIN-DESIGN.md`.
 - Leaderboards: top lists computed locally from signed results of peers ("gossip leaderboard"). Not tamper-proof, but sufficient for fun.
 
 ### 4.5 Data That Is Shared
@@ -87,7 +93,7 @@ Only: public key, name, avatar parameters (~200 bytes), lobby position, signed l
 
 ### 5.1 Core Loop (2 to 5 minutes)
 1. The player picks a **node** on the world map (a level).
-2. Solves a colorful **match-3 puzzle** ("quantum particles" in 6 colors, swipe/tap). 
+2. Solves a colorful **match-3 puzzle** ("quantum particles" in 6 colors, swipe/tap).
 3. Special effects: **Superposition** (a particle is two colors at once), **Entanglement** (two particles react together), **Tunneling** (a particle jumps through obstacles), **Collapse** (bomb).
 4. Result: 1 to 3 stars plus **quantum energy** plus a random reward (dopamine loop).
 5. Energy expands the player's own **universe** (meta game).
@@ -110,30 +116,35 @@ Not a linear list but a **graph**:
 
 ### 5.4 Lobby ("Nexus")
 - A floating anime plaza in space. Avatars walk around (stick on the left, emote wheel on the right).
-- Activities: mini duels (asynchronous puzzle with the same seed), trading post (decoration), cooperative **raid levels** (all players solve one mega level over several days), photo spots, music jam.
+- Activities: mini duels (asynchronous puzzle with the same seed), trading post (decoration), cooperative **raid levels** (all players solve one mega level over several days), photo spots, music jam, the **Shop**.
 - Chat: **emotes/stickers** by default, free text optional.
 
 ### 5.5 Avatars
 - 3D, chibi anime style (cel-shaded). Kit: body shape, hair (50+), eyes, outfits, wings/tails, aura.
-- Unlockable through play (never pay to win), sharing = parameters only.
+- Unlockable through play (never pay to win), cosmetic premium items in the Shop, sharing = parameters only.
 - The avatar walks in the lobby and the universe; in levels it appears as a mascot that cheers.
 
 ### 5.6 Addiction/Retention Mechanics (responsible)
 - Dense micro rewards (combo sounds, confetti, stars).
-- Daily login reward, daily quests, weekly events.
+- Daily login reward, daily quests, weekly events, seasons with the Quantum Pass.
 - **Near-win moments** (level narrowly missed -> "one more try").
 - Visible collections (avatar parts, particle skins, music tracks).
 - Social: lobby presence, cooperative raids.
-- **Ethics**: no real-money loot boxes, no dark patterns, optional break reminders (also important for store policies).
+- **Ethics**: no paid random loot boxes, no dark patterns, optional break reminders (also important for store policies).
 
-### 5.7 Monetization (compatible with anonymity)
-Without accounts, classic subscriptions/purchases are difficult. Options: one-time premium purchase, cosmetic purchases via Google Play, voluntary donations (Monero/Lightning), optional ad-free mode. To be decided later.
+### 5.7 Monetization
+Free to play. Revenue through cosmetics and convenience only; details, rules and the Shop Keeper service are in `SUSTAINABILITY.md` section 5.
+- **Quanta** (earned by playing) is never sold.
+- **Crystals** (premium shop credit) are sold in packs, not transferable, not convertible to money.
+- **Quantum Pass**: seasonal free and premium reward track, cosmetics only.
+- **Limited drops, bundles, convenience slots**, optional supporter pack.
+- Never: ads, paid random boxes, pay-to-win.
 
 ## 6. Art and Music
 
 - **Visuals**: colorful, pastel plus neon, cel-shaded 3D, 2D puzzle with large, soft shapes.
 - **Music** (anime style): J-pop/future bass/lo-fi chill per world, adaptive music (layers fade in on combos).
-- Licensing: original compositions or CC0/commissioned work (**no** copyrighted anime songs).
+- Licensing: original compositions or CC0/commissioned work (**no** copyrighted anime songs). Own art, music and brand stay proprietary to protect revenue.
 - Sound design: every combo produces a tone sequence in key with the music.
 
 ## 7. Roadmap
@@ -141,13 +152,15 @@ Without accounts, classic subscriptions/purchases are difficult. Options: one-ti
 | Phase | Content | Result |
 |---|---|---|
 | 0: Concept (2 to 3 weeks) | This plan, paper prototype sketches, engine decision | Go/No-Go |
-| 1: Vertical slice (2 to 3 months) | Match-3 core, 20 levels, world map, placeholder music, basic avatar | Playable APK prototype, fun test |
+| 1: Vertical slice (2 to 3 months) | Match-3 core, 20 levels, world map, placeholder music, basic avatar. Soft launch to measure retention and payer conversion | Playable APK prototype, fun test |
 | 2: Meta (2 to 3 months) | Universe building mode, progression, teleportation, 100+ levels, music | Single-player beta |
+| 2.5: Ledger spec (1 to 2 months) | Leaf and claim formats, emission model, economy simulator, local `ChainBackend` | Spec v1 |
 | 3: Identity and P2P (3 months) | Key-based identity, automatic transport manager (Tor first), DHT, lobby with 2 to 10 players, invisible-networking UX | Test lobby |
+| 3a to 3c: Chain and Shop | Private testnet, pruning and bootstrap, Shop Authority and Crystals (see `CHAIN-DESIGN.md` section 10) | Closed beta with first purchases |
 | 4: I2P, duels, raids (2 to 3 months) | I2P added to the transport manager, asynchronous duels, trading, events | Open beta |
 | 5: Launch and live operation | F-Droid/Play, community nodes, content updates | 1.0 |
 
-**Recommendation:** prove the fun first (phase 1), only then build the expensive networking. The network must never block fun: the game must be **fully playable offline**.
+**Recommendation:** prove the fun first (phase 1), only then build the expensive networking and chain. The network must never block fun: the game must be **fully playable offline**.
 
 ## 8. Risks
 
@@ -159,12 +172,14 @@ Without accounts, classic subscriptions/purchases are difficult. Options: one-ti
 | Store rejection | Privacy documentation, F-Droid alternative |
 | Scope too large | Strict phases, single-player first |
 | Cheating | Deterministic levels plus replay verification |
+| Weak retention or conversion | Soft launch in phase 1 before building network and chain |
+| Regulation of virtual currency | Closed-loop currencies, legal review, see `CHAIN-DESIGN.md` section 9 |
 
 ## 9. Open Questions
 
 1. Core gameplay: is match-3 fine, or rather runner/idle/builder?
 2. Engine: Godot (open source) or Unity?
-3. Target audience/age (affects chat and store rating)?
-4. Monetization: free, one-time purchase, donations?
-5. Team: solo or with an artist/composer?
-6. Distribution: Google Play, F-Droid or both?
+3. Target audience/age (affects chat, shop and store rating)?
+4. Team: solo or with an artist/composer?
+5. Distribution: Google Play, F-Droid or both?
+6. Open questions on shop, accounts and governance: see `SUSTAINABILITY.md` section 7 and `IDENTITY-SHOP.md` section 5.
