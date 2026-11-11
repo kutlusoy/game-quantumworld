@@ -7,7 +7,7 @@ const TOPS := ["jacket", "crop", "tank"]
 const SLEEVES := ["long", "short", "none"]
 const LEGWEAR := ["pants", "shorts"]
 const EXPRESSIONS := ["friendly", "neutral"]
-const ACCESSORIES := ["headphones", "glasses", "goggles", "scarf", "coat"]
+const ACCESSORIES := ["headphones", "glasses", "goggles", "scarf", "coat", "cape", "pauldrons", "belt", "sash", "skirt", "bracers", "kneepads", "collar", "necklace", "earrings", "bow", "tail", "halo"]
 const GENDERS := ["female", "male"]
 
 const SKIN := ["ffe3d2", "f3d2bb", "e9bf9c", "d6a07c", "b57c58", "8a5a3c", "684330"]
@@ -93,6 +93,8 @@ static func save_config(c: Dictionary) -> void:
 	if f != null:
 		f.store_string(JSON.stringify(clamp_config(c)))
 
+const PRESET_COUNT := 8
+
 static func from_preset(i: int) -> Dictionary:
 	var presets := [
 		{"name": "Rin", "gender": "female", "age": 21, "curve": 0.5, "hair_style": "bob", "hair": 0, "skin": 0, "eyes": 0, "outfit": 0, "top": "crop", "sleeves": "none", "legwear": "pants", "accessories": ["headphones"], "seed": 11},
@@ -100,6 +102,9 @@ static func from_preset(i: int) -> Dictionary:
 		{"name": "Mira", "gender": "female", "age": 24, "curve": 0.65, "hair_style": "long", "hair": 2, "skin": 0, "eyes": 2, "outfit": 2, "top": "jacket", "sleeves": "long", "accessories": ["glasses"], "seed": 37},
 		{"name": "Ren", "gender": "male", "age": 23, "muscle": 0.95, "hair_style": "spiky", "hair": 3, "skin": 2, "eyes": 3, "outfit": 3, "top": "tank", "sleeves": "none", "accessories": ["goggles"], "seed": 41},
 		{"name": "Sora", "gender": "female", "age": 20, "curve": 0.5, "hair_style": "ponytail", "hair": 4, "skin": 0, "eyes": 4, "outfit": 4, "top": "tank", "sleeves": "none", "legwear": "shorts", "accessories": [], "seed": 53},
+		{"name": "Yuna", "gender": "female", "age": 25, "curve": 0.55, "hair_style": "ponytail", "hair": 6, "skin": 3, "eyes": 3, "outfit": 7, "top": "tank", "sleeves": "none", "legwear": "pants", "accessories": ["cape", "pauldrons", "belt", "bracers", "kneepads", "necklace"], "seed": 61},
+		{"name": "Hana", "gender": "female", "age": 22, "curve": 0.6, "hair_style": "long", "hair": 5, "skin": 1, "eyes": 0, "outfit": 5, "top": "jacket", "sleeves": "short", "legwear": "pants", "accessories": ["skirt", "bow", "sash", "earrings", "collar"], "seed": 71},
+		{"name": "Jin", "gender": "male", "age": 28, "muscle": 0.75, "hair_style": "spiky", "hair": 8, "skin": 5, "eyes": 6, "outfit": 6, "top": "jacket", "sleeves": "long", "legwear": "pants", "accessories": ["cape", "pauldrons", "belt", "bracers", "collar", "halo"], "seed": 83},
 	]
 	var d := default_config()
 	for k in presets[i % presets.size()]:

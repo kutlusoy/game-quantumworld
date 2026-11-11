@@ -16,11 +16,22 @@ func _init() -> void:
 	check(c["curve"] <= 0.75 and c["muscle"] >= 0.35, "sliders clamped")
 	check(c["top"] == "jacket" and c["hair"] == Config.HAIR.size() - 1, "invalid options fall back")
 	check(c["accessories"] == ["glasses"], "accessories filtered and unique")
-	for i in 5:
+	for i in Config.PRESET_COUNT:
 		var a := AnimeAvatar.new()
 		a.build(Config.to_params(Config.from_preset(i)))
 		check(a.tri_count > 4000, "preset %d builds" % i)
 		a.free()
+	for g in ["female", "male"]:
+		var full := Config.default_config()
+		full["gender"] = g
+		full["accessories"] = Config.ACCESSORIES.duplicate()
+		var fa := AnimeAvatar.new()
+		fa.build(Config.to_params(full))
+		root.add_child(fa)
+		check(fa.cape_pivot != null and fa.tail_pivot != null, "%s builds with every accessory" % g)
+		for i in 30:
+			fa.update_pose(Vector3(0, 0, -0.1), true, false, false, Vector2(0, -1), 0.016)
+		fa.queue_free()
 	var cfg := Config.default_config()
 	cfg["name"] = "Test"
 	cfg["hair_style"] = "long"

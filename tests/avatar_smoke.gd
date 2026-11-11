@@ -47,7 +47,7 @@ func _init() -> void:
 	var lineup = load("res://scenes/avatar_lineup.tscn").instantiate()
 	root.add_child(lineup)
 	await process_frame
-	check(lineup.avatars.size() == presets.size(), "lineup shows every preset")
+	check(lineup.avatars.size() == load("res://scripts/world3d/avatar_config.gd").PRESET_COUNT, "lineup shows every preset")
 	if failures == 0:
 		print("AVATAR SMOKE PASSED")
 	quit(1 if failures > 0 else 0)

@@ -1,7 +1,7 @@
 extends Node3D
 
 const AnimeAvatar = preload("res://scripts/world3d/anime_avatar.gd")
-const Presets = preload("res://scripts/world3d/avatar_presets.gd")
+const Config = preload("res://scripts/world3d/avatar_config.gd")
 
 var avatars: Array = []
 var cam: Camera3D
@@ -27,8 +27,8 @@ func _ready() -> void:
 	add_child(we)
 	var floor := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
-	disc.top_radius = 4.2
-	disc.bottom_radius = 4.2
+	disc.top_radius = 4.8
+	disc.bottom_radius = 4.8
 	disc.height = 0.1
 	floor.mesh = disc
 	var fm := StandardMaterial3D.new()
@@ -37,11 +37,11 @@ func _ready() -> void:
 	floor.material_override = fm
 	floor.position.y = -0.05
 	add_child(floor)
-	var presets := Presets.all()
-	for i in presets.size():
+	var count: int = Config.PRESET_COUNT
+	for i in count:
 		var a := AnimeAvatar.new()
-		a.build(presets[i])
-		var x := (i - (presets.size() - 1) / 2.0) * 1.05
+		a.build(Config.to_params(Config.from_preset(i)))
+		var x := (i - (count - 1) / 2.0) * 1.0
 		a.position = Vector3(x, 0, 0)
 		add_child(a)
 		avatars.append(a)
@@ -52,7 +52,7 @@ func _ready() -> void:
 
 func _place_camera() -> void:
 	var target := Vector3(0, 1.05, 0)
-	cam.position = target + Vector3(sin(orbit) * 5.6, 0.25, cos(orbit) * 5.6)
+	cam.position = target + Vector3(sin(orbit) * 8.2, 0.25, cos(orbit) * 8.2)
 	cam.look_at(target, Vector3.UP)
 
 func _process(delta: float) -> void:
