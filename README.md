@@ -1,6 +1,6 @@
 # Quantum World
 
-Android game built with Godot 4.3: a 3D anime-style open-world platformer with block-based building. Design documents are in `docs/`; start with `docs/PLAN.md` and `docs/GAMEPLAY-3D.md`.
+Android game built with Godot 4.3: a 3D anime-style open-world platformer with block-based building. Design documents are in `docs/`; start with `docs/PLAN.md` and `docs/GAMEPLAY-3D.md`. Engine choice and the AI-assisted asset pipeline are in `docs/ASSET-PIPELINE.md`.
 
 ## Status
 
